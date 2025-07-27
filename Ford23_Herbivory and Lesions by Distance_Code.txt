@@ -1,0 +1,1063 @@
+#Herbivory and lesions by distance from Ford Center 2023 (Ford Center only)
+#The same outline was used for Ford Center years 2024 and 2025
+data = F2023
+head(F2023)
+library(tidyverse)
+
+#insect count by distance from Ford Center
+ggplot(F2023) + 
+  geom_point(mapping = aes(Distance_Ford, Insect_num)) +
+  geom_smooth(mapping = aes(Distance_Ford, Insect_num))
+
+#Herbivory score by distance from Ford Center
+ggplot(F2023) + 
+  geom_point(mapping = aes(Distance_Ford, Herb_score)) +
+  geom_smooth(mapping = aes(Distance_Ford, Herb_score))
+
+#Lesion score by distance from Ford Center
+ggplot(F2023) + 
+  geom_point(mapping = aes(Distance_Ford, Lesion_score)) +
+  geom_smooth(mapping = aes(Distance_Ford, Lesion_score))
+
+#Boxplot of Distance vs Herbivory score
+boxplot(Herb_score ~ Distance_Ford, data = F2023,
+        xlab = "Distance_Ford", ylab = "Herbivory Score (%)",
+        frame = FALSE, col = c("palegreen3"))
+
+#Boxplot of Distance vs Lesion score
+boxplot(Lesion_score ~ Distance_Ford, data = F2023,
+        xlab = "Distance_Ford", ylab = "Lesion score (%)",
+        frame = FALSE, col = c("palegreen3"))
+
+#Boxplot of Distance vs Insect count
+boxplot(Insect_num ~ Distance_Ford, data = F2023,
+        xlab = "Distance_Ford", ylab = "Insect Count",
+        frame = FALSE, col = c("palegreen3"))
+
+#_____________________________________________________________________________________
+#HERBIVORY################################
+
+#PCA For Herbivory
+
+FPr <- prcomp(F2023[5:17], scale. = TRUE)
+
+#works: FPr <- prcomp(Ford23byTemp[14:17], scale. = TRUE): ALL FACTORS MUST BE NUMERIC FOR THIS PART
+
+summary(FPr)
+
+
+plot(FPr)
+biplot(FPr)
+library(plot3D)
+scores <- as.data.frame(FPr$x)
+head(scores)
+
+
+plot3D::scatter3D(scores$PC1, scores$PC2, scores$PC3, scores$PC4)
+
+Fordnew <- cbind(F2023, FPr$x[,1:4])
+head(Fordnew)
+
+library(ggplot2)
+
+
+ggplot(Fordnew, aes(PC1, PC2, col = as.factor(Distance_Group), fill =as.factor(Distance_Group))) +
+  stat_ellipse(geom = "polygon", col = "black", alpha = 0.2) +
+  geom_point(shape = 21, col = "black")
+
+#watch the parentheses here, so annoying. Also no quotes around Distance_Group or it all goes to hell. 
+
+#PC1 is mostly measuring population, distance, MAT, and Rain
+#PC2 is mostly measuring low and high temps, and PPT
+  
+
+library(ggfortify)
+print(FPr)
+summary(FPr)
+autoplot(FPr, data = F2023,
+         loadings = TRUE, loadings.colour = "dodgerblue4",
+         loadings.label = TRUE,
+         loadings.label.colour = "black",
+         #   colour = "steelblue1",
+         loadings.label.size = 4,
+         loadings.label.vjust = 1.4,
+         loadings.label.hjust = 0.8,
+         color = 'Distance_Ford'
+) +
+  theme_classic() +
+  theme(axis.text = element_text(color = "black"),
+        text = element_text(size = 16)) +
+  scale_color_gradient(low = "magenta", high = "midnightblue", name = str_wrap ("Seed source Distance from Ford Center(km)", width = 8))
+
+#________________________________________________________________________________
+
+#build null model for Herbivory 
+
+nullmodelH <- glm(Herb_score ~ 1, family = poisson(link = "log"), data =F2023)
+summary(nullmodelH)
+
+#Deviance Residuals: 
+#Min       1Q      Median       3Q      Max  
+#-5.1855  -2.6454  -0.9846   1.6659   7.6310  
+
+#Coefficients:
+#  Estimate Std. Error z value Pr(>|z|)    
+#(Intercept)   2.5986     0.0147   176.7   <2e-16 ***
+ 
+#  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#(Dispersion parameter for poisson family taken to be 1)
+
+#Null deviance: 3359  on 343  degrees of freedom
+#Residual deviance: 3359  on 343  degrees of freedom
+#AIC: 4738
+
+#Number of Fisher Scoring iterations: 5
+#___________________________________________________________________________  
+
+#Poisson 
+glm_poisson1 <- glm(Herb_score ~ Distance_Ford, family = poisson(link = "log"), data = F2023)
+summary(glm_poisson1)
+
+#Deviance Residuals: 
+#Min      1Q     Median      3Q     Max  
+#-5.389  -2.846  -1.228   1.371   8.245  
+
+#Coefficients:
+#                 Estimate     Std. Error  z value   Pr(>|z|)    
+#(Intercept)      2.684e+00    1.997e-02   134.436    < 2e-16 ***
+#  Distance_Ford -1.899e-04    3.136e-05   -6.055     1.41e-09 ***
+  
+#  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#(Dispersion parameter for poisson family taken to be 1)
+
+#Null deviance: 3359.0  on 343  degrees of freedom
+#Residual deviance: 3321.6  on 342  degrees of freedom
+#AIC: 4702.5
+
+#Number of Fisher Scoring iterations: 5
+
+with(summary(glm_poisson1), 1 - deviance/null.deviance)
+#R2 is 0.01115248
+
+#_______________________________________________________________________________________
+#Quasi Poisson
+glm_qpoisson1 <- glm(Herb_score ~ Distance_Ford, family = quasipoisson(link = "log"), data = F2023)
+
+summary(glm_qpoisson1)
+
+#Call:glm(formula = Herb_score ~ Distance_Ford, family = quasipoisson(link = "log"), data = F2023)
+
+#Deviance Residuals: 
+#  Min      1Q    Median    3Q     Max  
+#-5.389  -2.846  -1.228   1.371   8.245  
+
+#Coefficients:
+#               Estimate Std. Error      t value  Pr(>|t|)    
+#(Intercept)       2.6844397  0.0660911   40.617   <2e-16 ***
+#  Distance_Ford  -0.0001899  0.0001038  -1.829    0.0682 .  
+
+#  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#(Dispersion parameter for quasipoisson family taken to be 10.9549)
+
+#Null deviance: 3359.0  on 343  degrees of freedom
+#Residual deviance: 3321.6  on 342  degrees of freedom
+#AIC: NA
+
+#Number of Fisher Scoring iterations: 5
+
+#calculate R2 for glm_qpoisson1 model 
+
+with(summary(glm_qpoisson1), 1 - deviance/null.deviance)
+
+#R2 is 0.01115248, no difference from Poisson model
+
+#_________________________________________________________________________________________________
+library(arm)
+
+
+coef1 = coef(glm_poisson1)
+
+coef2 = coef(glm_qpoisson1)
+
+se.coef1 = se.coef(glm_poisson1)
+
+se.coef2 = se.coef(glm_qpoisson1)
+
+models.both <- cbind(coef1, se.coef1, coef2, se.coef2, exponent = exp(coef1))
+
+models.both
+
+
+                    # coef1     se.coef1         coef2     se.coef2   exponent
+#(Intercept)    2.6844396962 1.996819e-02  2.6844396962 0.0660910813 14.6499906
+#Distance_Ford -0.0001898883 3.136113e-05 -0.0001898883 0.0001037997  0.9998101
+
+
+1-0.9998101
+#0.0001899 need to group distance into categories to get an accurate reading here. Oops. 
+
+
+#__________________________________________________________________________________________________
+#trying again with distance separated into groups: Short (4-56km), Mid (79-158km), Long (173-1333km)
+
+#Poisson 
+glm_poisson1 <- glm(Herb_score ~ Distance_Group, family = poisson(link = "log"), data = F2023)
+summary(glm_poisson1)
+
+#Deviance Residuals: 
+#Min      1Q     Median      3Q     Max  
+#-5.434  -2.829  -1.185   1.330   8.027  
+
+#Coefficients:
+#                     Estimate    Std. Error  z value     Pr(>|z|)    
+#(Intercept)            2.51502    0.02187   114.978    < 2e-16 ***
+#  Distance_GroupMid    0.14039    0.03536   3.970      7.20e-05 ***
+#  Distance_GroupShort  0.17703    0.03585   4.939      7.87e-07 ***
+
+#  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#(Dispersion parameter for poisson family taken to be 1)
+
+#Null deviance: 3359.0  on 343  degrees of freedom
+#Residual deviance: 3329.4  on 341  degrees of freedom
+#AIC: 4712.4
+
+#Number of Fisher Scoring iterations: 5
+
+with(summary(glm_poisson1), 1 - deviance/null.deviance)
+#R2 is 0.008816546
+
+#_______________________________________________________________________________________
+#Quasi Poisson
+glm_qpoisson1 <- glm(Herb_score ~ Distance_Group, family = quasipoisson(link = "log"), data = F2023)
+
+summary(glm_qpoisson1)
+
+#Deviance Residuals: 
+#Min      1Q     Median     3Q     Max  
+#-5.434  -2.829  -1.185   1.330   8.027  
+
+#Coefficients:
+#                     Estimate    Std. Error t value   Pr(>|t|)    
+#(Intercept)            2.51502    0.07258    34.649   <2e-16 ***
+#  Distance_GroupMid    0.14039    0.11735     1.196    0.232    
+#Distance_GroupShort    0.17703    0.11895     1.488    0.138    
+
+#  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#(Dispersion parameter for quasipoisson family taken to be 11.01136)
+
+#Null deviance: 3359.0  on 343  degrees of freedom
+#Residual deviance: 3329.4  on 341  degrees of freedom
+#AIC: NA
+
+#Number of Fisher Scoring iterations: 5
+
+#calculate R2 for glm_qpoisson1 model 
+
+with(summary(glm_qpoisson1), 1 - deviance/null.deviance)
+
+#R2 is 0.008816546, no difference from Poisson model
+
+#_________________________________________________________________________________________________
+library(arm)
+
+
+coef1 = coef(glm_poisson1)
+
+coef2 = coef(glm_qpoisson1)
+
+se.coef1 = se.coef(glm_poisson1)
+
+se.coef2 = se.coef(glm_qpoisson1)
+
+models.both <- cbind(coef1, se.coef1, coef2, se.coef2, exponent = exp(coef1))
+
+models.both
+
+#                       coef1   se.coef1     coef2   se.coef2  exponent
+#(Intercept)         2.5150206 0.02187390 2.5150206 0.07258498 12.366864
+#Distance_GroupMid   0.1403858 0.03536478 0.1403858 0.11735227  1.150718
+#Distance_GroupShort 0.1770292 0.03584577 0.1770292 0.11894834  1.193666
+
+1-1.150718
+#-0.150718
+# 15.07% increase in herbivory between Mid distance range and Long range assuming all other variables are constant
+
+1-1.193666
+#-0.193666
+# 19.37% increase between Short distance and Long distance assuming all other variables constant
+
+#______________________________________________________________________________________________________
+#predict new data using models
+
+#for short distance group
+newdata = data.frame(Distance_Group = "Short")
+predict(glm_poisson1, newdata = newdata, type = "response")
+
+#average 14.7619 percent herbivory (herbivory score) for Short Distance Group using Poisson model
+
+#for Mid distance group
+newdata = data.frame(Distance_Group = "Mid")
+predict(glm_poisson1, newdata = newdata, type = "response")
+
+#average 14.23077 percent herbivory (herbivory score) for Mid Distance Group using Poisson model
+
+#for Long distance group
+newdata = data.frame(Distance_Group = "Long")
+predict(glm_poisson1, newdata = newdata, type = "response")
+#average 12.36686 percent herbivory (herbivory score) for Long Distance Group using Poisson model
+
+library(broom)
+library(broom.mixed)
+library(jtools)
+library(ggstance)
+
+# plot regression coefficients and std error for glm_qpoisson
+plot_summs(glm_qpoisson1, scale = TRUE, exp = TRUE)
+
+# plot regression coefficients and std error for glm_qpoisson and glm_poisson (model comparison)
+plot_summs(glm_poisson1, glm_qpoisson1, scale = TRUE, exp = TRUE)
+
+
+##############################################################################################
+#GLM for stepwise model: Herbivory by Distance
+
+glm_Herbivory <- glm(Herb_score ~ Distance_Ford + Population + Avg_Temp + Ppt + MAT +RainS, family = poisson(link = "log"), data = F2023)
+summary(glm_Herbivory)
+
+#Call:
+#glm(formula = Herb_score ~ Distance_Ford + Population + Avg_Temp + 
+#      Ppt + MAT + RainS, family = poisson(link = "log"), data = F2023)
+
+#Deviance Residuals: 
+#  Min      1Q  Median      3Q     Max  
+#-5.455  -2.667  -1.076   1.286   9.587  
+
+#Coefficients:
+#                 Estimate Std. Error z value Pr(>|z|)    
+#(Intercept)    0.7432386  0.4409556   1.686  0.09189 .  
+#Distance_Ford -0.0004664  0.0001559  -2.993  0.00276 ** 
+#  Population    -0.0033728  0.0028847  -1.169  0.24233    
+#Avg_Temp       0.0559138  0.0057035   9.803  < 2e-16 ***
+#  Ppt            0.0824222  0.0170388   4.837 1.32e-06 ***
+ # MAT            0.1144214  0.0250175   4.574 4.79e-06 ***
+#  RainS         -0.0060999  0.0009400  -6.489 8.65e-11 ***
+#  ---
+ # Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#(Dispersion parameter for poisson family taken to be 1)
+
+#Null deviance: 3359.0  on 343  degrees of freedom
+#Residual deviance: 3102.8  on 337  degrees of freedom
+#AIC: 4493.7
+
+#Number of Fisher Scoring iterations: 5
+
+#r2 = 1-residual deviance / null deviance
+
+1-3102.8/3359.0
+
+#r2= 0.0762727
+
+step(glm_Herbivory)
+#Start:  AIC=4493.7
+#Herb_score ~ Distance_Ford + Population + Avg_Temp + Ppt + MAT + 
+ # RainS
+
+#               Df Deviance    AIC
+#- Population     1   3104.1 4493.1
+#<none>               3102.8 4493.7
+#- Distance_Ford  1   3111.8 4500.7
+#- MAT            1   3124.0 4512.9
+#- Ppt            1   3126.0 4514.9
+#- RainS          1   3147.1 4536.0
+#- Avg_Temp       1   3204.6 4593.5
+
+#Step:  AIC=4493.06
+#Herb_score ~ Distance_Ford + Avg_Temp + Ppt + MAT + RainS
+
+#               Df Deviance    AIC
+#<none>               3104.1 4493.1
+#- Distance_Ford  1   3119.1 4506.0
+#- Ppt            1   3127.6 4514.5
+#- MAT            1   3128.9 4515.8
+#- RainS          1   3155.9 4542.9
+#- Avg_Temp       1   3205.4 4592.4
+
+#Call:  glm(formula = Herb_score ~ Distance_Ford + Avg_Temp + Ppt + MAT + 
+#             RainS, family = poisson(link = "log"), data = F2023)
+
+#Coefficients:
+#  (Intercept)  Distance_Ford       Avg_Temp            Ppt            MAT          RainS  
+#0.8014242     -0.0005429      0.0557637      0.0827222      0.1204464     -0.0063683  
+
+#Degrees of Freedom: 343 Total (i.e. Null);  338 Residual
+#Null Deviance:	    3359 
+#Residual Deviance: 3104 	AIC: 4493
+
+plot_summs(glm_Herbivory, scale = TRUE, exp = TRUE)
+
+
+plot_summs(glm_Herbivory, coefs = c("Mid Distance Group" =
+                                                     "Distance_GroupMid", 
+                                                "Short Distance Group" = "Distance_GroupShort",
+                                                "Population" = "Population",
+                                                "Average Temperature (°C)" = "Avg_Temp", 
+                                                "Precipitation" = "Ppt",
+                                                "Mean Annual Temperature" = "MAT",
+                                                "Average Seasonal Rain (cm)" = "RainS"),
+                       scale = TRUE, robust = TRUE)
+
+
+
+#r2 = 1-residual deviance / null deviance
+1-(3104/3359)
+#r2 = 0.07591545
+
+library(performance)
+
+check_model(glm_Herbivory)
+
+#MAT & Distance Ford violate colinearity, need to remove (when check with only Distance_ford, moderte violation. Still removed)
+
+glm_Herbivory2 <- glm(Herb_score ~ Population + Avg_Temp + Ppt + RainS, family = poisson(link = "log"), data = F2023)
+
+summary(glm_Herbivory2)
+check_model(glm_Herbivory2)
+
+#Call:
+#glm(formula = Herb_score ~ Population + Avg_Temp + Ppt + RainS, 
+ #   family = poisson(link = "log"), data = F2023)
+
+#Deviance Residuals: 
+#  Min      1Q  Median      3Q     Max  
+#-5.361  -2.692  -1.127   1.337   9.373  
+
+#Coefficients:
+#  Estimate Std. Error z value Pr(>|z|)    
+#(Intercept) -0.2800007  0.3828096  -0.731    0.465    
+#Population  -0.0028777  0.0024324  -1.183    0.237    
+#Avg_Temp     0.0553796  0.0056975   9.720  < 2e-16 ***
+#  Ppt          0.0807613  0.0170403   4.739 2.14e-06 ***
+#  RainS       -0.0019942  0.0004588  -4.347 1.38e-05 ***
+#  ---
+#  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#(Dispersion parameter for poisson family taken to be 1)
+
+#Null deviance: 3359.0  on 343  degrees of freedom
+#Residual deviance: 3129.3  on 339  degrees of freedom
+#AIC: 4516.2
+
+#Number of Fisher Scoring iterations: 5
+
+
+#r2 = 1-residual deviance / null deviance
+1-(3129.3/3359)
+#r2 = 0.06838345
+
+#remove RainS, add in MAT
+glm_Herbivory7 <- glm(Herb_score ~ Population + Avg_Temp + Ppt +MAT, family = poisson(link = "log"), data = F2023)
+
+summary(glm_Herbivory7)
+check_model(glm_Herbivory7)
+
+#remove MAT
+glm_Herbivory8 <- glm(Herb_score ~ Population + Avg_Temp + Ppt, family = poisson(link = "log"), data = F2023)
+
+summary(glm_Herbivory8)
+
+
+AIC(nullmodelH, glm_Herbivory, glm_Herbivory2, glm_Herbivory7, glm_Herbivory8)
+#                df      AIC
+
+#               df      AIC
+#nullmodelH      1 4737.967
+#glm_Herbivory   7 4493.695  --> colinearity violations
+#glm_Herbivory2  5 4516.239  
+#glm_Herbivory7  5 4534.047
+#glm_Herbivory8  4 4533.724
+
+#glm_Herbivory 2 has lowest AIC and no colin violations, use this one
+#model: glm(Herb_score ~ Population + Avg_Temp + Ppt + RainS
+
+
+PCAh <- prcomp(F2023[c(5,11,12, 14)], scale=TRUE)
+PCAh
+#Standard deviations (1, .., p=4):
+#[1] 1.3180377 1.1501292 0.8212071 0.5153625
+
+#Rotation (n x k) = (4 x 4):
+#              PC1         PC2         PC3         PC4
+#Population 0.70497507 -0.05343618 -0.00052842 -0.70721598
+#Avg_Temp   0.06963727  0.70313977 -0.70743360  0.01681701
+#Ppt        0.04252517  0.70660849  0.70623166 -0.01152754
+#RainS      0.70452282 -0.05868115  0.02782542  0.70670352
+
+summary(PCAh)
+#Importance of components:
+#                       PC1    PC2    PC3    PC4
+#Standard deviation     1.3180 1.1501 0.8212 0.5154
+#Proportion of Variance 0.4343 0.3307 0.1686 0.0664
+#Cumulative Proportion  0.4343 0.7650 0.9336 1.0000
+
+
+plot(PCAh)
+biplot(PCAh)
+PCAh$x
+library(plot3D)
+scores <- as.data.frame(PCAh$x)
+head(scores)
+
+plot3D::scatter3D(scores$PC1, scores$PC2, scores$PC3)
+
+Herbnew <- cbind(F2023, PCAh$x[,1:2])
+head(Herbnew)
+
+ggplot(Herbnew, aes(PC1, PC2, col = as.factor(Distance_Group), fill = as.factor(Distance_Group))) +
+  stat_ellipse(geom = "polygon", col = "black", alpha = 0.2) +
+  geom_point(shape = 21, col = "black")
+
+#########################################################################################################################################
+#LESIONS!
+
+#build null model for Lesions
+
+nullmodelL <- glm(Lesion_score ~ 1, family = poisson(link = "log"), data =F2023)
+summary(nullmodelL)
+
+#Call:
+#glm(formula = Lesion_score ~ 1, family = poisson(link = "log"),  data = F2023)
+
+#Deviance Residuals: 
+#  Min       1Q   Median       3Q      Max  
+#-3.5666  -2.0231  -0.5606   1.3306  12.7291  
+
+#Coefficients:
+#  Estimate Std. Error z value Pr(>|z|)    
+#(Intercept)  1.85010    0.02138   86.54   <2e-16 ***
+ 
+#  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#(Dispersion parameter for poisson family taken to be 1)
+
+#Null deviance: 2629.7  on 343  degrees of freedom
+#Residual deviance: 2629.7  on 343  degrees of freedom
+#AIC: 3636.5
+
+#Number of Fisher Scoring iterations: 5
+
+#_____________________________________________________________________________
+#Poisson for Lesions
+glm_poisson1 <- glm(Lesion_score ~ Distance_Group, family = poisson(link = "log"), data = F2023)
+summary(glm_poisson1)
+
+#Deviance Residuals: 
+#Min       1Q   Median       3Q      Max  
+#-3.6795  -2.1591  -0.7134   1.1586  12.9652  
+
+#Coefficients:
+#  Estimate Std. Error z value Pr(>|z|)    
+#(Intercept)          1.79373    0.03137  57.177   <2e-16 ***
+#  Distance_GroupMid    0.11866    0.05106   2.324   0.0201 *  
+#  Distance_GroupShort  0.09622    0.05275   1.824   0.0681 .  
+
+#  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#(Dispersion parameter for poisson family taken to be 1)
+
+#Null deviance: 2629.7  on 343  degrees of freedom
+#Residual deviance: 2623.2  on 341  degrees of freedom
+#AIC: 3634
+
+#Number of Fisher Scoring iterations: 5
+
+with(summary(glm_poisson1), 1 - deviance/null.deviance)
+#R2 is 0.002472684
+
+#_______________________________________________________________________________________
+#Quasi Poisson
+glm_qpoisson1 <- glm(Lesion_score ~ Distance_Group, family = quasipoisson(link = "log"), data = F2023)
+
+summary(glm_qpoisson1)
+
+#Deviance Residuals: 
+#Min       1Q   Median       3Q      Max  
+#-3.6795  -2.1591  -0.7134   1.1586  12.9652  
+
+#Coefficients:
+#                       Estimate Std. Error t value Pr(>|t|)    
+#(Intercept)          1.79373    0.10417  17.220   <2e-16 ***
+#  Distance_GroupMid    0.11866    0.16955   0.700    0.485    
+#Distance_GroupShort  0.09622    0.17516   0.549    0.583    
+
+#Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#(Dispersion parameter for quasipoisson family taken to be 11.02513)
+
+#Null deviance: 2629.7  on 343  degrees of freedom
+#Residual deviance: 2623.2  on 341  degrees of freedom
+#AIC: NA
+
+#Number of Fisher Scoring iterations: 5
+
+with(summary(glm_qpoisson1), 1 - deviance/null.deviance)
+
+#R2 is 0.002472684, no diff from Poisson
+
+#_________________________________________________________________________________________________
+library(arm)
+
+
+coef1 = coef(glm_poisson1)
+
+coef2 = coef(glm_qpoisson1)
+
+se.coef1 = se.coef(glm_poisson1)
+
+se.coef2 = se.coef(glm_qpoisson1)
+
+models.both <- cbind(coef1, se.coef1, coef2, se.coef2, exponent = exp(coef1))
+
+models.both
+#                         coef1   se.coef1      coef2  se.coef2 exponent
+#(Intercept)         1.79372992 0.03137157 1.79372992 0.1041665 6.011834
+#Distance_GroupMid   0.11865754 0.05106311 0.11865754 0.1695505 1.125984
+#Distance_GroupShort 0.09622158 0.05275157 0.09622158 0.1751569 1.101003
+
+1-1.125984
+#-0.125984
+#12.5984% increase in lesions between Mid distance group and Long distance group assuming all other variables constant
+
+1-1.101003
+#-0.101003
+#10.1003% increase in lesions between Short distance group and Long distance group assuming all other variables constant
+
+#--------------------------------------------------------------------------------------------------------------------------
+
+#predict new data using models
+
+#for short distance group
+newdata = data.frame(Distance_Group = "Short")
+predict(glm_poisson1, newdata = newdata, type = "response")
+
+#average 6.619048 percent lesion (lesion score) for Short Distance Group using Poisson model
+
+#for Mid distance group
+newdata = data.frame(Distance_Group = "Mid")
+predict(glm_poisson1, newdata = newdata, type = "response")
+
+#average 6.76931 percent lesion (lesion score) for Mid Distance Group using Poisson model
+
+#for Long distance group
+newdata = data.frame(Distance_Group = "Long")
+predict(glm_poisson1, newdata = newdata, type = "response")
+#average 6.011834 percent lesion (lesion score) for Long Distance Group using Poisson model
+
+library(broom)
+library(broom.mixed)
+library(jtools)
+library(ggstance)
+
+# plot regression coefficients and std error for glm_qpoisson
+plot_summs(glm_qpoisson1, scale = TRUE, exp = TRUE)
+
+# plot regression coefficients and std error for glm_qpoisson and glm_poisson (model comparison)
+plot_summs(glm_poisson1, glm_qpoisson1, scale = TRUE, exp = TRUE)
+
+#-----------------------------------------------------------------------------------------------------------------------
+
+#GLM for stepwise model: Lesions by Distance
+
+glm_Lesion <- glm(Lesion_score ~ Distance_Group + Population + Avg_Temp + Ppt + MAT +RainS, family = poisson(link = "log"), data = F2023)
+summary(glm_Lesion)
+
+#Deviance Residuals: 
+#Min       1Q   Median       3Q      Max  
+#-4.9251  -2.1272  -1.0030   0.4401  11.6584  
+
+#Coefficients:
+#                     Estimate Std. Error z value Pr(>|z|)    
+#(Intercept)         -5.705673   0.688611  -8.286  < 2e-16 ***
+ # Distance_GroupMid    0.646090   0.102761   6.287 3.23e-10 ***
+ # Distance_GroupShort  0.586973   0.100232   5.856 4.74e-09 ***
+ # Population           0.026935   0.004482   6.010 1.85e-09 ***
+ # Avg_Temp             0.146780   0.009265  15.843  < 2e-16 ***
+ # Ppt                 -0.241320   0.027141  -8.891  < 2e-16 ***
+#  MAT                  0.069504   0.018964   3.665 0.000247 ***
+ # RainS               -0.004909   0.001219  -4.026 5.68e-05 ***
+ 
+#  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#(Dispersion parameter for poisson family taken to be 1)
+
+#Null deviance: 2629.7  on 343  degrees of freedom
+#Residual deviance: 2264.3  on 336  degrees of freedom
+#AIC: 3285.1
+
+#Number of Fisher Scoring iterations: 6
+
+
+
+#r2 = 1-residual deviance / null deviance
+1-2264.3/2629.7
+ #r2=0.1389512
+
+step(glm_Lesion)
+
+#Start:  AIC=3285.13
+#Lesion_score ~ Distance_Group + Population + Avg_Temp + Ppt + 
+ # MAT + RainS
+
+#                 Df  Deviance  AIC
+#<none>                2264.3 3285.1
+#- MAT             1   2278.1 3296.9
+#- RainS           1   2281.0 3299.8
+#- Population      1   2300.7 3319.5
+#- Distance_Group  2   2308.1 3324.9
+#- Ppt             1   2347.2 3366.1
+#- Avg_Temp        1   2553.0 3571.9
+
+#Call:  glm(formula = Lesion_score ~ Distance_Group + Population + Avg_Temp + 
+#             Ppt + MAT + RainS, family = poisson(link = "log"), data = F2023)
+
+#Coefficients:
+#  (Intercept)    Distance_GroupMid  Distance_GroupShort           Population  
+#-5.705673             0.646090             0.586973             0.026935  
+#Avg_Temp                  Ppt                  MAT                RainS  
+#0.146780            -0.241320             0.069504            -0.004909  
+
+#Degrees of Freedom: 343 Total (i.e. Null);  336 Residual
+#Null Deviance:	    2630 
+#Residual Deviance: 2264 	AIC: 3285
+
+#plotting coefficients: 
+plot_summs(glm_Lesion, scale = TRUE, exp = TRUE)
+
+plot_summs(glm_Lesion, coefs = c("Mid Distance Group" =
+                                      "Distance_GroupMid", 
+                                    "Short Distance Group" = "Distance_GroupShort",
+                                    "Population" = "Population",
+                                    "Average Temperature (°C)" = "Avg_Temp", 
+                                    "Precipitation" = "Ppt",
+                                    "Mean Annual Temperature" = "MAT",
+                                    "Average Seasonal Rain (cm)" = "RainS"),
+           scale = TRUE, robust = TRUE)
+
+
+
+#r2 = 1-residual deviance / null deviance
+1-(2264/2630)
+#r2 = 0.131635
+
+library(performance)
+
+check_model(glm_Lesion)
+
+
+#MAT violates colinearity, need to remove
+
+
+glm_Lesion2 <- glm(Lesion_score ~ Distance_Group + Population + Avg_Temp + Ppt +RainS, family = poisson(link = "log"), data = F2023)
+
+summary(glm_Lesion2)
+
+#r2 = 1-residual deviance / null deviance
+1-2278.1/2629.7
+#r2= 0.1337035
+
+#Remove RainS
+
+glm_Lesion3 <- glm(Lesion_score ~ Distance_Group + Population + Avg_Temp + Ppt, family = poisson(link = "log"), data = F2023)
+
+summary(glm_Lesion3)
+
+#r2 = 1-residual deviance / null deviance
+1-2281.6/2629.7
+#r2=0.1323725
+
+AIC(nullmodelL, glm_Lesion, glm_Lesion2, glm_Lesion3)
+#            df      AIC
+#nullmodelL   1 3636.517
+#glm_Lesion   8 3285.131 (colinearity violation)
+#glm_Lesion2  7 3296.878
+#glm_Lesion3  6 3298.436
+
+PCAl <- prcomp(F2023[c(5,6,7)], scale=TRUE)
+PCAl
+
+#Standard deviations (1, .., p=3):
+#[1] 1.3511142 0.9998041 0.4181891
+
+#Rotation (n x k) = (3 x 3):
+#              PC1         PC2          PC3
+#Population    0.70695439 -0.01391923 -0.707122161
+#Distance_Ford 0.70692022 -0.01704205  0.707087953
+#Day_Temp_Avg  0.02189293  0.99975788  0.002208168
+
+plot(PCAl)
+biplot(PCAl)
+PCAl$x
+library(plot3D)
+scores <- as.data.frame(PCAl$x)
+head(scores)
+
+plot3D::scatter3D(scores$PC1, scores$PC2, scores$PC3)
+
+Lesionnew <- cbind(F2023, PCAl$x[,1:3])
+head(Lesionnew)
+
+ggplot(Lesionnew, aes(PC1, PC2, col = as.factor(Distance_Group), fill = as.factor(Distance_Group))) +
+  stat_ellipse(geom = "polygon", col = "black", alpha = 0.2) +
+  geom_point(shape = 21, col = "black")
+
+#------------------------------------------------------------------------------------------------------------
+#That's It! BACK TO HERBIVORY! 
+#--------------------------------------------------------------------------------------------------------------
+#MLM for Herbivory  
+reduced.lmerH <- lmer(Herb_score ~ 1 + (1|Distance_Group),  F2023)
+
+mixed.lmerH <- lmer(Herb_score ~ Week + (1|Distance_Group), F2023)
+summary(mixed.lmerH)
+
+#std error larger than slope... not good. 
+
+plot(mixed.lmerH)
+qqnorm(resid(mixed.lmerH))
+qqline(resid(mixed.lmerH)) 
+#not linear, not normally distributed. 
+#--------------------------------------------------------------------------------------------------------------
+#MLM for Lesions
+reduced.lmerL <- lmer(Lesion_score ~ 1 + (1|Distance_Group),  F2023)
+mixed.lmerL <- lmer(Lesion_score ~ Week + (1|Distance_Group), F2023)
+summary(mixed.lmerL)
+
+#std error slightly smaller than slope
+
+plot(mixed.lmerL)
+qqnorm(resid(mixed.lmerL))
+qqline(resid(mixed.lmerL)) 
+#more linear than herbivory, gets weird at end though
+
+#--------------------------------------------------------------------------------------------
+#try a linear model
+#0--------------------------------------------------------------
+#by N S instead of distance group 
+glm_Lesion <- glm(Lesion_score ~ Distance_Group + Population + Avg_Temp + Ppt + MAT +RainS, family = poisson(link = "log"), data = F2023)
+summary(glm_Lesion)
+
+##############################################################################################
+#GLM for stepwise model: Herbivory by Distance: population climate 
+
+glm_Herbivory <- glm(Herb_score ~ Distance_Group + Population + MAT +RainS, family = poisson(link = "log"), data = F2023)
+summary(glm_Herbivory)
+
+
+
+#Deviance Residuals: 
+#Min      1Q  Median      3Q     Max  
+#-5.782  -2.660  -1.093   1.228   8.129  
+
+#Coefficients:
+#  Estimate Std. Error z value Pr(>|z|)    
+#(Intercept)          4.4334873  0.2812509  15.763  < 2e-16 ***
+#  Distance_GroupMid   -0.0898679  0.0673259  -1.335 0.181936    
+#Distance_GroupShort  0.0194512  0.0631933   0.308 0.758231    
+#Population          -0.0082146  0.0031052  -2.645 0.008159 ** 
+#  MAT                  0.0480907  0.0128055   3.755 0.000173 ***
+ # RainS               -0.0048916  0.0008367  -5.846 5.02e-09 ***
+
+#  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#(Dispersion parameter for poisson family taken to be 1)
+
+#Null deviance: 3359.0  on 343  degrees of freedom
+#Residual deviance: 3275.8  on 338  degrees of freedom
+#AIC: 4664.7
+
+#Number of Fisher Scoring iterations: 5
+
+
+
+step(glm_Herbivory)
+#Start:  AIC=4664.74
+#Herb_score ~ Distance_Group + Population + MAT + RainS
+
+#Df Deviance    AIC
+#<none>                3275.8 4664.7
+#- Distance_Group  2   3283.0 4667.9
+#- Population      1   3282.8 4669.7
+#- MAT             1   3290.1 4677.1
+#- RainS           1   3311.0 4698.0
+
+#Call:  glm(formula = Herb_score ~ Distance_Group + Population + MAT + 
+#             RainS, family = poisson(link = "log"), data = F2023)
+
+#Coefficients:
+#  (Intercept)    Distance_GroupMid  Distance_GroupShort           Population                  MAT  
+#4.433487            -0.089868             0.019451            -0.008215             0.048091  
+#RainS  
+#-0.004892  
+
+#Degrees of Freedom: 343 Total (i.e. Null);  338 Residual
+#Null Deviance:	    3359 
+#Residual Deviance: 3276 	AIC: 4665
+
+plot_summs(glm_Herbivory, scale = TRUE, exp = TRUE)
+
+
+plot_summs(glm_Herbivory, coefs = c("Mid Distance Group" =
+                                      "Distance_GroupMid", 
+                                    "Short Distance Group" = "Distance_GroupShort",
+                                    "Population" = "Population",
+                                    "Mean Annual Temperature" = "MAT",
+                                    "Average Seasonal Rain (cm)" = "RainS"),
+           scale = TRUE, robust = TRUE)
+
+
+##############################################################################################
+#GLM for stepwise model: Herbivory by Distance, local Ford Center Climate
+
+glm_Herbivory <- glm(Herb_score ~ Distance_Group + Population + Avg_Temp + Ppt, family = poisson(link = "log"), data = F2023)
+summary(glm_Herbivory)
+
+#Call:glm(formula = Herb_score ~ Distance_Group + Population + Avg_Temp + Ppt + MAT + RainS, family = poisson(link = "log"), data = F2023)
+
+#Deviance Residuals: 
+#Min      1Q  Median      3Q     Max  
+#-5.279  -2.708  -1.242   1.261   9.651  
+
+#Coefficients:
+#  Estimate Std. Error z value Pr(>|z|)    
+#(Intercept)         -0.977633   0.351147  -2.784  0.00537 ** 
+#  Distance_GroupMid   -0.036921   0.059337  -0.622  0.53379    
+#Distance_GroupShort  0.019773   0.053107   0.372  0.70965    
+#Population          -0.011665   0.002890  -4.036 5.44e-05 ***
+#  Avg_Temp             0.055350   0.005697   9.715  < 2e-16 ***
+#  Ppt                  0.079790   0.017035   4.684 2.81e-06 ***
+#  ---
+#  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#(Dispersion parameter for poisson family taken to be 1)
+
+#Null deviance: 3359.0  on 343  degrees of freedom
+#Residual deviance: 3146.9  on 338  degrees of freedom
+#AIC: 4535.8
+
+#Number of Fisher Scoring iterations: 5
+
+step(glm_Herbivory)
+
+
+plot_summs(glm_Herbivory, scale = TRUE, exp = TRUE)
+
+
+plot_summs(glm_Herbivory, coefs = c("Mid Distance Group" =
+                                      "Distance_GroupMid", 
+                                    "Short Distance Group" = "Distance_GroupShort",
+                                    "Population" = "Population",
+                                    "Average Temperature (°C)" = "Avg_Temp", 
+                                    "Precipitation" = "Ppt"),
+           scale = TRUE, robust = TRUE)
+
+#Average Temp significant
+
+##############################################################################################
+#GLM for stepwise model: Lesions by Distance, local Ford Center Climate
+
+glm_Lesions <- glm(Lesion_score ~ Distance_Group + Population + Avg_Temp + Ppt, family = poisson(link = "log"), data = F2023)
+summary(glm_Lesions)
+
+#Call:
+#glm(formula = Lesion_score ~ Distance_Group + Population + Avg_Temp + 
+ #     Ppt, family = poisson(link = "log"), data = F2023)
+
+#Deviance Residuals: 
+#  Min       1Q   Median       3Q      Max  
+#-4.7847  -2.1129  -0.9933   0.4015  12.1266  
+
+#Coefficients:
+#  Estimate Std. Error z value Pr(>|z|)    
+#(Intercept)         -7.117227   0.569068 -12.507  < 2e-16 ***
+#  Distance_GroupMid    0.569241   0.084640   6.725 1.75e-11 ***
+#  Distance_GroupShort  0.461521   0.078669   5.867 4.45e-09 ***
+#  Population           0.026068   0.004191   6.221 4.95e-10 ***
+#  Avg_Temp             0.145992   0.009254  15.775  < 2e-16 ***
+ # Ppt                 -0.242442   0.027137  -8.934  < 2e-16 ***
+  
+#  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#(Dispersion parameter for poisson family taken to be 1)
+
+#Null deviance: 2629.7  on 343  degrees of freedom
+#Residual deviance: 2281.6  on 338  degrees of freedom
+#AIC: 3298.4
+
+#Number of Fisher Scoring iterations: 6
+step(glm_Lesions)
+
+
+plot_summs(glm_Lesions, scale = TRUE, exp = TRUE)
+
+
+plot_summs(glm_Lesions, coefs = c("Mid Distance Group" =
+                                      "Distance_GroupMid", 
+                                    "Short Distance Group" = "Distance_GroupShort",
+                                    "Population" = "Population",
+                                    "Average Temperature (°C)" = "Avg_Temp", 
+                                    "Precipitation" = "Ppt"),
+           scale = TRUE, robust = TRUE)
+
+
+##############################################################################################
+#GLM for stepwise model: Lesions by Distance: population climate 
+
+glm_Lesions <- glm(Herb_score ~ Distance_Group + Population + MAT +RainS, family = poisson(link = "log"), data = F2023)
+summary(glm_Lesions)
+
+#Call:
+#  glm(formula = Herb_score ~ Distance_Group + Population + MAT + 
+   #     RainS, family = poisson(link = "log"), data = F2023)
+
+#Deviance Residuals: 
+#  Min      1Q  Median      3Q     Max  
+#-5.782  -2.660  -1.093   1.228   8.129  
+
+#Coefficients:
+#  Estimate Std. Error z value Pr(>|z|)    
+#(Intercept)          4.4334873  0.2812509  15.763  < 2e-16 ***
+#Distance_GroupMid   -0.0898679  0.0673259  -1.335 0.181936    
+#Distance_GroupShort  0.0194512  0.0631933   0.308 0.758231    
+#Population          -0.0082146  0.0031052  -2.645 0.008159 ** 
+#  MAT                  0.0480907  0.0128055   3.755 0.000173 ***
+#  RainS               -0.0048916  0.0008367  -5.846 5.02e-09 ***
+
+#  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+#(Dispersion parameter for poisson family taken to be 1)
+
+#Null deviance: 3359.0  on 343  degrees of freedom
+#Residual deviance: 3275.8  on 338  degrees of freedom
+#AIC: 4664.7
+
+#Number of Fisher Scoring iterations: 5
+
+
+
+step(glm_Lesions)
+
+
+plot_summs(glm_Lesions, scale = TRUE, exp = TRUE)
+
+
+plot_summs(glm_Lesions, coefs = c("Mid Distance Group" =
+                                      "Distance_GroupMid", 
+                                    "Short Distance Group" = "Distance_GroupShort",
+                                    "Population" = "Population",
+                                    "Mean Annual Temperature" = "MAT",
+                                    "Average Seasonal Rain (cm)" = "RainS"),
+           scale = TRUE, robust = TRUE)
