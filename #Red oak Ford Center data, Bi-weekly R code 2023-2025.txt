@@ -1,0 +1,1340 @@
+#Red oak Ford Center data, all bi-weekly study years (2023-2025).
+data = F_Herb_Les
+library(tidyverse)
+citation ("tidyverse")
+library(ggplot2)
+citation ("ggplot2")
+library(jtools)
+citation ("jtools")
+library(readxl)
+citation ("readxl")
+library(betareg)
+citation ("betareg")
+library(performance)
+citation ("performance")
+library(statmod)
+citation ("statmod")
+library(numDeriv)
+citation ("numDeriv")
+library(broom)
+citation("broom")
+
+#data viz
+#herb score by year 
+ggplot(F_Herb_Les) + 
+  geom_point(mapping = aes(Date, Herb_score)) +
+  geom_smooth(mapping = aes(Date, Herb_score))
+
+ggplot(F_Herb_Les, aes(Date, Herb_score)) +
+  geom_point(color = "navy", alpha = 0.4, size = 1.5) +
+  geom_smooth(color = "magenta", fill = "pink", linewidth = 1.2) +
+  labs(
+    x = "Date",
+    y = "Herbivory Score (%)",
+  ) +
+  theme_minimal()
+
+#lesion score by year 
+ggplot(F_Herb_Les) + 
+  geom_point(mapping = aes(Date, Lesion_score)) +
+  geom_smooth(mapping = aes(Date, Lesion_score))
+
+ggplot(F_Herb_Les, aes(Date, Lesion_score)) +
+  geom_point(color = "navy", alpha = 0.4, size = 1.5) +
+  geom_smooth(color = "magenta", fill = "pink", linewidth = 1.2) +
+  labs(
+    x = "Date",
+    y = "Lesion Score (%)",
+  ) +
+  theme_minimal()
+
+#Insect number by distance from Ford Center
+ggplot(F_Herb_Les) + 
+  geom_point(mapping = aes(Distance_Ford, Insect_num)) +
+  geom_smooth(mapping = aes(Distance_Ford, Insect_num))
+
+#Herbivory score by distance from Ford Center
+ggplot(F_Herb_Les) + 
+  geom_point(mapping = aes(Distance_Ford, Herb_score, colour = MAT, size = IndivFam)) +
+  geom_smooth(mapping = aes(Distance_Ford, Herb_score))
+
+#Lesion score by distance from Ford Center
+ggplot(F_Herb_Les) + 
+  geom_point(mapping = aes(Distance_Ford, Lesion_score, colour = MAT, size = IndivFam)) +
+  geom_smooth(mapping = aes(Distance_Ford, Lesion_score))
+
+#Boxplot of Distance vs Herbivory score
+boxplot(Herb_score ~ Distance_Ford, data = F_Herb_Les,
+        xlab = "Distance_Ford", ylab = "Herbivory Score (%)",
+        frame = FALSE, col = c("palegreen3"))
+
+#Boxplot of Distance vs Lesion score
+boxplot(Lesion_score ~ Distance_Ford, data = F_Herb_Les,
+        xlab = "Distance_Ford", ylab = "Lesion score (%)",
+        frame = FALSE, col = c("palegreen3"))
+
+#Boxplot of Distance vs Insect count
+boxplot(Insect_num ~ Distance_Ford, data = F_Herb_Les,
+        xlab = "Distance_Ford", ylab = "Insect Count",
+        frame = FALSE, col = c("palegreen3"))
+
+#####################################################################################################
+#correlograms
+library(corrplot)
+library(wesanderson)
+library(patchwork)
+
+pal <- wes_palette(10, name = "Darjeeling2", type = "continuous")
+
+correlations1=cor(F_Herb_Les[c(27,9,12,14,15,17,19,21:26)])
+corr1 <- corrplot(correlations1, order="hclust",  tl.col = "black",  col=pal)
+
+correlations2=cor(F_Herb_Les[c(28,9,12,14,15,17,19,21:26)])
+corr2 <- corrplot(correlations2, order="hclust",  tl.col = "black",  col=pal)
+
+
+ corr1 + corr2
+  plot_layout(ncol = 2)
+##############
+
+#Investigate Herbivory
+#herbivory is response variable 
+
+ls.str(F_Herb_Les)
+
+hist(F_Herb_Les$Herb_score, main = "Herbivory Score, Ford Center, 2023-2025", xlab = "Herbivory Score (%)", col = "skyblue3", border = "black")
+
+summary(F_Herb_Les$Herb_score)
+var(F_Herb_Les$Herb_score)
+
+shapiro.test(F_Herb_Les$Herb_score)
+
+####
+#lesions
+hist(F_Herb_Les$Lesion_score, main = "Lesion Score, Ford Center, 2023-2025", xlab = "Lesion Score (%)", col = "skyblue3", border = "black")
+summary(F_Herb_Les$Lesion_score)
+var(F_Herb_Les$Lesion_score)
+
+shapiro.test(F_Herb_Les$Lesion_score)
+
+##############################
+#Models
+#convert % to value between 0 and 1 for betareg models
+
+
+F_Herb_Les$HerbPerct = F_Herb_Les$Herb_score/ (100)
+
+F_Herb_Les$LesPerct = F_Herb_Les$Lesion_score/ (100)
+
+summary(F_Herb_Les)
+
+#####################
+#null herbivory
+nullmodelH <- betareg(HerbPerct ~ 1, data = F_Herb_Les)
+summary(nullmodelH)
+
+#predict mean Herbivory
+F_Herb_Les$pred_Herb <- predict(nullmodelH, type = "response")
+new_obs <- data.frame(dummy = 1)
+new_pred_H <- predict(nullmodelH, newdata = new_obs, type = "response")
+cat("Predicted Mean Herbivory:", new_pred_H, "\n")
+#Predicted Mean Herbivory: 0.1883147 
+
+#predict variance Herbivory
+F_Herb_Les$pred_Herb <- predict(nullmodelH, type = "variance")
+new_obs <- data.frame(dummy = 1)
+new_pred_H <- predict(nullmodelH, newdata = new_obs, type = "variance")
+cat("Predicted Variance Herbivory:", new_pred_H, "\n")
+#Predicted Variance Herbivory: 0.02353244 
+
+#null lesions
+nullmodelL <- betareg(LesPerct ~ 1, data = F_Herb_Les)
+summary(nullmodelL)
+
+#Predict mean Lesions
+new_pred_L <- predict(nullmodelL, newdata = new_obs, type = "response")
+new_obs <- data.frame(dummy = 1)
+cat("Predicted Mean Lesions:", new_pred_L, "\n")
+#Predicted Mean Lesions: 0.1146354
+
+#Predict variance Lesions
+new_pred_L <- predict(nullmodelL, newdata = new_obs, type = "variance")
+new_obs <- data.frame(dummy = 1)
+cat("Predicted Variance Lesions:", new_pred_L, "\n")
+#Predicted Variance Lesions: 0.01448134 
+
+#prep herbivory and lesions from 0-1 for betareg models
+
+F_Herb_Les$HerbPerct = F_Herb_Les$Herb_score/ (100)
+
+F_Herb_Les$LesPerct = F_Herb_Les$Lesion_score/ (100)
+
+#override F_Herb_Les
+F_Herb_Les <- F_Herb_Les %>% 
+  separate(J_Date,into=c("year", "J_Date"), sep=2, convert=TRUE) 
+
+####
+
+#y~ day model for effect over time for herbivory
+DAY <- betareg(HerbPerct ~ J_Date, data = F_Herb_Les)
+summary(DAY)
+
+#add in year as factor to create a line for each year
+model_all_h <- betareg(HerbPerct ~ J_Date * as.factor(Year), data = F_Herb_Les)
+
+# Make a prediction grid
+pred_grid <- expand.grid(
+  J_Date = seq(min(F_Herb_Les$J_Date), max(F_Herb_Les$J_Date), length.out = 100),
+  Year = unique(F_Herb_Les$Year)
+)
+
+#model to predict HerbPerct 
+pred_grid$HerbPerct_pred <- predict(model_all_h, newdata = pred_grid)
+
+#Plot both points and the predicted lines
+ggplot(F_Herb_Les, aes(x = J_Date, y = HerbPerct, color = as.factor(Year))) +
+  geom_point(alpha = 0.4, shape = 21, aes(fill = as.factor(Year)), color = "black") + 
+  geom_line(data = pred_grid, aes(y = HerbPerct_pred), size = 1.2) +
+  scale_color_viridis_d() +
+  scale_fill_viridis_d() +
+  theme_minimal() +
+  labs(
+    title = "Herbivory by Year",
+    x = "Julian Date",
+    y = "Herbivory (%)",
+    color = "Year",
+    fill = "Year"
+  )
+
+summary(model_all_h)
+
+#make summary more easily readable
+library(broom)
+
+model_table_h <- tidy(model_all_h)
+####################
+
+#same for lesions
+
+#y~ day model for effect over time for lesions
+DAY <- betareg(LesPerct ~ J_Date, data = F_Herb_Les)
+summary(DAY)
+
+#add in year as factor to create a line for each year
+model_all_l <- betareg(LesPerct ~ J_Date * as.factor(Year), data = F_Herb_Les)
+
+# Make prediction grid
+pred_grid <- expand.grid(
+  J_Date = seq(min(F_Herb_Les$J_Date), max(F_Herb_Les$J_Date), length.out = 100),
+  Year = unique(F_Herb_Les$Year)
+)
+
+pred_grid$LesPerct_pred <- predict(model_all_l, newdata = pred_grid)
+
+#Plot both points and the predicted lines
+ggplot(F_Herb_Les, aes(x = J_Date, y = LesPerct, color = as.factor(Year))) +
+  geom_point(alpha = 0.4, shape = 21, aes(fill = as.factor(Year)), color = "black") + 
+  geom_line(data = pred_grid, aes(y = LesPerct_pred), size = 1.2) +
+  scale_color_viridis_d() +
+  scale_fill_viridis_d() +
+  theme_minimal() +
+  labs(
+    title = "Lesions by Year",
+    x = "Julian Date",
+    y = "Lesions (%)",
+    color = "Year",
+    fill = "Year"
+  )
+
+summary(model_all_l)
+model_table_l <- tidy(model_all_l)
+
+#check models against null model: Herbivory
+library(lmtest)
+citation("lmtest")
+
+lrtest(nullmodelH, model_all_h)
+#plot residuals vs indices and residuals vs linear predictor
+par(mfrow = c(1, 2))
+plot(model_all_h, which = c(1, 4))
+
+lrtest(nullmodelL, model_all_l)
+#plot residuals vs indices and residuals vs linear predictor
+par(mfrow = c(1, 2))
+plot(model_all_l, which = c(1, 4))
+
+#plot residuals with Q-Q for day models
+qqnorm(resid(DAY), main = "Normal Q-Q Plot of Residuals: Herbivory", 
+       sub = "Day Model", 
+       col = "blue")
+
+qqline(resid(DAY), 
+       col = "magenta",        
+       lwd = 2,            
+       lty = 2)
+
+qqnorm(resid(DAYL), main = "Normal Q-Q Plot of Residuals: Lesions", 
+       sub = "Day Model", 
+       col = "blue")
+
+qqline(resid(DAYL), 
+       col = "magenta",        
+       lwd = 2,            
+       lty = 2)
+
+########################33
+#y ~ Geography model for herbivory
+
+GEO_h <- betareg(HerbPerct ~ Distance_Group + J_Date * as.factor(Year), 
+                           data = F_Herb_Les)
+
+summary(GEO_h)
+
+
+pred_grid_geo <- expand.grid(
+  J_Date = seq(min(F_Herb_Les$J_Date), max(F_Herb_Les$J_Date), length.out = 100),
+  Year = unique(F_Herb_Les$Year),
+  Distance_Group = unique(F_Herb_Les$Distance_Group)[1] 
+)
+
+# Predict 
+pred_grid_geo$Herb_Pred <- predict(GEO_h, newdata = pred_grid_geo)
+
+# Create a full prediction grid for ALL groups
+full_pred_grid <- expand.grid(
+  J_Date = seq(min(F_Herb_Les$J_Date), max(F_Herb_Les$J_Date), length.out = 100),
+  Year = unique(F_Herb_Les$Year),
+  Distance_Group = unique(F_Herb_Les$Distance_Group)
+)
+
+full_pred_grid$Herb_Pred <- predict(GEO_h, newdata = full_pred_grid)
+
+#try slopes instead 
+
+GEO_slope_model <- betareg(HerbPerct ~ J_Date * Distance_Group * as.factor(Year), 
+                           data = F_Herb_Les)
+
+pred_grid_slopes <- expand.grid(
+  J_Date = seq(min(F_Herb_Les$J_Date), max(F_Herb_Les$J_Date), length.out = 100),
+  Year = unique(F_Herb_Les$Year),
+  Distance_Group = unique(F_Herb_Les$Distance_Group)
+)
+
+# Predict herbivory 
+pred_grid_slopes$Herb_Pred <- predict(GEO_slope_model, newdata = pred_grid_slopes)
+
+ggplot(F_Herb_Les, aes(x = J_Date, y = HerbPerct, color = Distance_Group)) +
+  geom_point(alpha = 0.2, size = 1) + 
+  geom_line(data = pred_grid_slopes, aes(y = Herb_Pred), size = 1.2) +
+  facet_wrap(~ Year) +
+  scale_color_viridis_d(option = "turbo") +
+  theme_minimal() +
+  labs(
+    title = "Herbivory by Distance Group",
+    x = "Julian Date",
+    y = "Herbivory (%)",
+    color = "Distance Group"
+  ) +
+  theme(legend.position = "bottom")
+
+
+summary(GEO_slope_model)
+
+library(lmtest)
+citation("lmtest")
+
+lrtest(nullmodelH, GEO_slope_model)
+
+#plot residuals vs indices and residuals vs linear predictor
+par(mfrow = c(1, 2))
+plot(GEO_slope_model, which = c(1, 4))
+
+##############
+#LESIONS
+GEOL_slope_model <- betareg(LesPerct ~ J_Date * Distance_Group * as.factor(Year), 
+                           data = F_Herb_Les)
+
+pred_grid_slopes <- expand.grid(
+  J_Date = seq(min(F_Herb_Les$J_Date), max(F_Herb_Les$J_Date), length.out = 100),
+  Year = unique(F_Herb_Les$Year),
+  Distance_Group = unique(F_Herb_Les$Distance_Group)
+)
+
+# Predict herbivory 
+pred_grid_slopes$Les_Pred <- predict(GEOL_slope_model, newdata = pred_grid_slopes)
+
+ggplot(F_Herb_Les, aes(x = J_Date, y = LesPerct, color = Distance_Group)) +
+  geom_point(alpha = 0.2, size = 1) + 
+  geom_line(data = pred_grid_slopes, aes(y = Les_Pred), size = 1.2) +
+  facet_wrap(~ Year) +
+  scale_color_viridis_d(option = "turbo") +
+  theme_minimal() +
+  labs(
+    title = "Lesions by Distance Group",
+    x = "Julian Date",
+    y = "Lesions (%)",
+    color = "Distance Group"
+  ) +
+  theme(legend.position = "bottom")
+
+
+summary(GEOL_slope_model)
+lrtest(nullmodelL, GEOL_slope_model)
+
+#plot residuals vs indices and residuals vs linear predictor
+par(mfrow = c(1, 2))
+plot(GEOL_slope_model, which = c(1, 4))
+
+#plot residuals using Q-Q
+
+qqnorm(resid(GEO), main = "Normal Q-Q Plot of Residuals: Herbivory", 
+      sub = "Geography Model", 
+      col = "blue")
+
+qqline(resid(GEO), 
+       col = "magenta",        
+       lwd = 2,            
+       lty = 2)
+
+qqnorm(resid(GEOL), main = "Normal Q-Q Plot of Residuals: Lesions", 
+       sub = "Geography Model", 
+       col = "blue")
+
+qqline(resid(GEOL), 
+       col = "magenta",        
+       lwd = 2,            
+       lty = 2)
+#################
+#weather model Herbivory
+
+#weather counts 
+WTHRC <- betareg(
+  HerbPerct ~ (J_Date * as.factor(Year)) + 
+    Rain_14D + Rain_over0.2_14D + Temp_32under_14D + Temp_80over_14D, 
+  data = F_Herb_Les
+)
+
+pred_grid_wthrc <- expand.grid(
+  J_Date = seq(min(F_Herb_Les$J_Date), max(F_Herb_Les$J_Date), length.out = 100),
+  Year = unique(F_Herb_Les$Year)
+) %>%
+  mutate(
+    Rain_14D = mean(F_Herb_Les$Rain_14D, na.rm = TRUE),
+    Rain_over0.2_14D = mean(F_Herb_Les$Rain_over0.2_14D, na.rm = TRUE),
+    Temp_32under_14D = mean(F_Herb_Les$Temp_32under_14D, na.rm = TRUE),
+    Temp_80over_14D = mean(F_Herb_Les$Temp_80over_14D, na.rm = TRUE)
+  )
+
+# Predict 
+pred_grid_wthrc$Herb_Pred <- predict(WTHRC, newdata = pred_grid_wthrc)
+
+ggplot(F_Herb_Les, aes(x = J_Date, y = HerbPerct, color = as.factor(Year))) +
+  geom_point(alpha = 0.3, shape = 21, aes(fill = as.factor(Year)), color = "black") + 
+  geom_line(data = pred_grid_wthrc, aes(y = Herb_Pred), size = 1.2) +
+  scale_fill_viridis_d(option = "viridis") +
+  scale_color_viridis_d(option = "viridis") +
+  theme_minimal() +
+  labs(
+    title = "Herbivory Slopes Adjusted for Weather",
+    x = "Julian Date",
+    y = "Herbivory (%)",
+    color = "Year",
+    fill = "Year"
+  )
+summary(WTHRC)
+
+#use weather as slopes instead (rain) for graph example
+WTHRC_slope <- betareg(
+  HerbPerct ~ J_Date * (Rain_14D + Rain_over0.2_14D + Temp_32under_14D + Temp_80over_14D) + 
+    as.factor(Year), 
+  data = F_Herb_Les
+)
+
+high_rain <- quantile(F_Herb_Les$Rain_14D, 0.90, na.rm = TRUE)
+low_rain  <- quantile(F_Herb_Les$Rain_14D, 0.10, na.rm = TRUE)
+
+pred_grid_weather <- expand.grid(
+  J_Date = seq(min(F_Herb_Les$J_Date), max(F_Herb_Les$J_Date), length.out = 100),
+  Rain_14D = c(low_rain, high_rain),
+  Year = unique(F_Herb_Les$Year)
+) %>%
+  mutate(
+    Rain_over0.2_14D = mean(F_Herb_Les$Rain_over0.2_14D, na.rm = TRUE),
+    Temp_32under_14D = mean(F_Herb_Les$Temp_32under_14D, na.rm = TRUE),
+    Temp_80over_14D = mean(F_Herb_Les$Temp_80over_14D, na.rm = TRUE),
+    Rain_Level = ifelse(Rain_14D == high_rain, "High Rain", "Low Rain")
+  )
+
+pred_grid_weather$Herb_Pred <- predict(WTHRC_slope, newdata = pred_grid_weather)
+
+ggplot(F_Herb_Les, aes(x = J_Date, y = HerbPerct)) +
+  geom_point(alpha = 0.2, color = "gray50") + 
+  geom_line(data = pred_grid_weather, 
+            aes(y = Herb_Pred, color = Rain_Level), 
+            size = 1.2) +
+  facet_wrap(~ Year) +
+  scale_color_manual(values = c("High Rain" = "steelblue", "Low Rain" = "magenta")) +
+  theme_minimal() +
+  labs(
+    title = "Impact of Rain on Herbivory",
+    x = "Julian Date",
+    y = "Herbivory (%)",
+    color = "Weather Condition"
+  )
+
+lrtest(nullmodelH, WTHRC)
+#plot residuals vs indices and residuals vs linear predictor
+par(mfrow = c(1, 2))
+plot(WTHRC, which = c(1, 4))
+
+#############
+#weather averages
+WTHRA <- betareg(HerbPerct ~ J_Date + Avg_minC_14D + Avg_maxC_14D + Avg_rainMM_14D, 
+                   data = F_Herb_Les)
+summary(WTHRA)
+
+
+WTHRA <- betareg(
+  HerbPerct ~ (J_Date * as.factor(Year)) + 
+    Avg_minC_14D + Avg_maxC_14D + Avg_rainMM_14D, 
+  data = F_Herb_Les
+)
+
+pred_grid_wthra <- expand.grid(
+  J_Date = seq(min(F_Herb_Les$J_Date), max(F_Herb_Les$J_Date), length.out = 100),
+  Year = unique(F_Herb_Les$Year)
+) %>%
+  mutate(
+    Avg_minC_14D = mean(F_Herb_Les$Avg_minC_14D, na.rm = TRUE),
+    Avg_maxC_14D = mean(F_Herb_Les$Avg_maxC_14D, na.rm = TRUE),
+    Avg_rainMM_14D= mean(F_Herb_Les$Avg_rainMM_14D, na.rm = TRUE)
+  )
+
+# Predict 
+pred_grid_wthra$Herb_Pred <- predict(WTHRA, newdata = pred_grid_wthra)
+
+ggplot(F_Herb_Les, aes(x = J_Date, y = HerbPerct, color = as.factor(Year))) +
+  geom_point(alpha = 0.3, shape = 21, aes(fill = as.factor(Year)), color = "black") + 
+  geom_line(data = pred_grid_wthra, aes(y = Herb_Pred), size = 1.2) +
+  scale_fill_viridis_d(option = "viridis") +
+  scale_color_viridis_d(option = "viridis") +
+  theme_minimal() +
+  labs(
+    title = "Herbivory Slopes Adjusted for Weather Averages",
+    x = "Julian Date",
+    y = "Herbivory (%)",
+    color = "Year",
+    fill = "Year"
+  )
+summary(WTHRA)
+
+lrtest(nullmodelH, WTHRA)
+#plot residuals vs indices and residuals vs linear predictor
+par(mfrow = c(1, 2))
+plot(WTHRA, which = c(1, 4))
+
+###############
+#Lesions weather model
+#weather counts 
+WTHRC <- betareg(
+  LesPerct ~ (J_Date * as.factor(Year)) + 
+    Rain_14D + Rain_over0.2_14D + Temp_32under_14D + Temp_80over_14D, 
+  data = F_Herb_Les
+)
+
+pred_grid_wthrc <- expand.grid(
+  J_Date = seq(min(F_Herb_Les$J_Date), max(F_Herb_Les$J_Date), length.out = 100),
+  Year = unique(F_Herb_Les$Year)
+) %>%
+  mutate(
+    Rain_14D = mean(F_Herb_Les$Rain_14D, na.rm = TRUE),
+    Rain_over0.2_14D = mean(F_Herb_Les$Rain_over0.2_14D, na.rm = TRUE),
+    Temp_32under_14D = mean(F_Herb_Les$Temp_32under_14D, na.rm = TRUE),
+    Temp_80over_14D = mean(F_Herb_Les$Temp_80over_14D, na.rm = TRUE)
+  )
+
+# Predict 
+pred_grid_wthrc$Les_Pred <- predict(WTHRC, newdata = pred_grid_wthrc)
+
+ggplot(F_Herb_Les, aes(x = J_Date, y = LesPerct, color = as.factor(Year))) +
+  geom_point(alpha = 0.3, shape = 21, aes(fill = as.factor(Year)), color = "black") + 
+  geom_line(data = pred_grid_wthrc, aes(y = Les_Pred), size = 1.2) +
+  scale_fill_viridis_d(option = "viridis") +
+  scale_color_viridis_d(option = "viridis") +
+  theme_minimal() +
+  labs(
+    title = "Lesion Slopes Adjusted for Weather",
+    x = "Julian Date",
+    y = "Lesions (%)",
+    color = "Year",
+    fill = "Year"
+  )
+summary(WTHRC)
+
+#use weather as slopes instead (rain) for graph example lesions
+pred_grid_weather <- expand.grid(
+  J_Date = seq(min(F_Herb_Les$J_Date, na.rm = TRUE), max(F_Herb_Les$J_Date, na.rm = TRUE), length.out = 100),
+  Rain_14D = c(low_rain, high_rain),
+  Year = unique(F_Herb_Les$Year)
+  ) %>%
+  mutate(
+    Rain_over0.2_14D = mean(F_Herb_Les$Rain_over0.2_14D, na.rm = TRUE),
+    Temp_32under_14D = mean(F_Herb_Les$Temp_32under_14D, na.rm = TRUE),
+    Temp_80over_14D = mean(F_Herb_Les$Temp_80over_14D, na.rm = TRUE),
+    Rain_Level = factor(ifelse(Rain_14D > mean(Rain_14D), "High Rain", "Low Rain"), 
+                        levels = c("Low Rain", "High Rain"))
+  )
+
+pred_grid_weather$Les_Pred <- predict(WTHRC_slope, newdata = pred_grid_weather)
+
+ggplot(F_Herb_Les, aes(x = J_Date, y = LesPerct)) +
+  geom_point(alpha = 0.2, color = "gray50") + 
+  geom_line(data = pred_grid_weather, 
+            aes(y = Les_Pred, color = Rain_Level), 
+            linewidth = 1.2) + 
+  facet_wrap(~ Year) +
+  scale_color_manual(values = c("High Rain" = "steelblue", "Low Rain" = "magenta")) +
+  theme_minimal() +
+  labs(
+    title = "Impact of Rain on Lesions",
+    x = "Julian Date",
+    y = "Lesions (%)",
+    color = "Weather Condition"
+  )
+
+lrtest(nullmodelL, WTHRC)
+
+#plot residuals vs indices and residuals vs linear predictor
+par(mfrow = c(1, 2))
+plot(WTHRC, which = c(1, 4))
+
+
+####
+WTHRAL <- betareg(
+  LesPerct ~ (J_Date * as.factor(Year)) + 
+    Avg_minC_14D + Avg_maxC_14D + Avg_rainMM_14D, 
+  data = F_Herb_Les
+)
+
+#predict
+pred_grid_wthra <- expand.grid(
+  J_Date = seq(min(F_Herb_Les$J_Date), max(F_Herb_Les$J_Date), length.out = 100),
+  Year = unique(F_Herb_Les$Year)
+) %>%
+  mutate(
+    Avg_minC_14D = mean(F_Herb_Les$Avg_minC_14D, na.rm = TRUE),
+    Avg_maxC_14D = mean(F_Herb_Les$Avg_maxC_14D, na.rm = TRUE),
+    Avg_rainMM_14D= mean(F_Herb_Les$Avg_rainMM_14D, na.rm = TRUE)
+  )
+
+# Predict 
+pred_grid_wthra$Les_Pred <- predict(WTHRAL, newdata = pred_grid_wthra)
+
+
+ggplot(F_Herb_Les, aes(x = J_Date, y = LesPerct, color = as.factor(Year))) +
+  geom_point(alpha = 0.3, shape = 21, aes(fill = as.factor(Year)), color = "black") + 
+  geom_line(data = pred_grid_wthra, aes(y = Les_Pred), size = 1.2) +
+  scale_fill_viridis_d(option = "viridis") +
+  scale_color_viridis_d(option = "viridis") +
+  theme_minimal() +
+  labs(
+    title = "Lesion Slopes Adjusted for Average Weather",
+    x = "Julian Date",
+    y = "Lesions (%)",
+    color = "Year",
+    fill = "Year"
+  )
+summary(WTHRAL)
+
+lrtest(nullmodelL, WTHRAL)
+
+#plot residuals vs indices and residuals vs linear predictor
+par(mfrow = c(1, 2))
+plot(WTHRLC, which = c(1, 4)) 
+
+####
+
+#plot residuals
+qqnorm(resid(WTHR), main = "Normal Q-Q Plot of Residuals: Herbivory", 
+       sub = "Weather Model", 
+       col = "blue")
+
+qqline(resid(WTHR), 
+       col = "magenta",        
+       lwd = 2,            
+       lty = 2)
+
+qqnorm(resid(WTHRL), main = "Normal Q-Q Plot of Residuals: Lesions", 
+       sub = "Weather Model", 
+       col = "blue")
+
+qqline(resid(WTHRL), 
+       col = "magenta",        
+       lwd = 2,            
+       lty = 2)
+
+####
+#climate model herbivory
+CLIM <- betareg(HerbPerct ~ J_Date + MAT + RainS, data = F_Herb_Les)
+
+summary(CLIM)
+#covariance, break up RainS and MAT into separate models
+
+boxplot(RainS ~ Year, data = F_Herb_Les)
+
+###################
+CLIMR <- betareg(HerbPerct ~ J_Date *as.factor(Year) + RainS, 
+                       data = F_Herb_Les)
+
+summary(CLIMR)
+
+#####
+high_rains <- quantile(F_Herb_Les$RainS, 0.90, na.rm = TRUE)
+low_rains  <- quantile(F_Herb_Les$RainS, 0.10, na.rm = TRUE)
+
+pred_grid_climr <- expand.grid(
+  J_Date = seq(min(F_Herb_Les$J_Date, na.rm = TRUE), 
+               max(F_Herb_Les$J_Date, na.rm = TRUE), 
+               length.out = 100),
+  RainS = c(low_rains, high_rains),
+  Year = unique(F_Herb_Les$Year)
+) %>%
+  mutate(
+    Rain_Level = ifelse(RainS > mean(RainS), "High Seasonal Rain", "Low Seasonal Rain")
+  )
+
+# Predict
+pred_grid_climr$Herb_Pred <- predict(CLIMR, newdata = pred_grid_climr)
+###
+
+#plot all years together
+ggplot(F_Herb_Les, aes(x = J_Date, y = HerbPerct)) +
+  geom_point(alpha = 0.2, color = "gray50") + 
+  geom_line(data = pred_grid_climr, 
+            aes(y = Herb_Pred, color = Rain_Level), 
+            linewidth = 1.2) +
+  facet_wrap(~ Year) +
+  scale_color_manual(values = c("High Summer Rainfall" = "magenta", 
+                                "Low Summer Rainfall" = "navy")) +
+  theme_minimal() +
+  labs(
+    title = "Provenance Summer Rainfall and Herbivory",
+    x = "Julian Date",
+    y = "Herbivory (%)",
+    color = "Provenance Summer Rainfall"
+  ) +
+  theme(legend.position = "bottom")
+####
+#separate years for more easily readable plots
+
+ggplot(F_Herb_Les, aes(x = J_Date, y = HerbPerct)) +
+  geom_point(alpha = 0.2, color = "gray50") + 
+  geom_line(data = pred_grid_climr, 
+            aes(y = Herb_Pred, color = Rain_Level), 
+            linewidth = 1.2) +
+  facet_wrap(~ Year) + 
+  scale_color_manual(values = c("High Seasonal Rain" = "magenta", 
+                                "Low Seasonal Rain" = "navy")) +
+  theme_bw() + 
+  labs(
+    title = "Provenance Summer Rainfall and Herbivory",
+    x = "Julian Date",
+    y = "Herbivory (%)",
+    color = "Provenance Summer Rainfall"
+  ) +
+  theme(legend.position = "bottom",
+        strip.background = element_rect(fill = "gray90"), 
+        strip.text = element_text(face = "bold"))
+
+lrtest(nullmodelH, CLIMR)
+
+#plot residuals vs indices and residuals vs linear predictor
+par(mfrow = c(1, 2))
+plot(CLIMR, which = c(1, 4))
+
+#####
+#try for MAT instead
+CLIMM <- betareg(HerbPerct ~ J_Date * as.factor(Year) + MAT, 
+                 data = F_Herb_Les)
+
+summary(CLIMM)
+
+
+high_mat <- quantile(F_Herb_Les$MAT, 0.90, na.rm = TRUE)
+low_mat  <- quantile(F_Herb_Les$MAT, 0.10, na.rm = TRUE)
+
+pred_grid_climm <- expand.grid(
+  J_Date = seq(min(F_Herb_Les$J_Date, na.rm = TRUE), 
+               max(F_Herb_Les$J_Date, na.rm = TRUE), 
+               length.out = 100),
+  MAT = c(low_mat, high_mat),
+  Year = unique(F_Herb_Les$Year)
+) %>%
+  mutate(
+    MAT_Level = ifelse(MAT > mean(MAT), "High MAT", "Low MAT")
+  )
+
+# Predict
+pred_grid_climm$Herb_Pred <- predict(CLIMM, newdata = pred_grid_climm)
+
+ggplot(F_Herb_Les, aes(x = J_Date, y = HerbPerct)) +
+  geom_point(alpha = 0.2, color = "gray50") + 
+  geom_line(data = pred_grid_climm, 
+            aes(y = Herb_Pred, color = MAT_Level), 
+            linewidth = 1.2) +
+  facet_wrap(~ Year) +
+  scale_color_manual(values = c("High MAT" = "magenta", 
+                                "Low MAT" = "navy")) +
+  theme_minimal() +
+  labs(
+    title = "Provenance MAT and Herbivory",
+    x = "Julian Date",
+    y = "Herbivory (%)",
+    color = "MAT"
+  ) +
+  theme(legend.position = "bottom")
+
+
+lrtest(nullmodelH, CLIMM)
+par(mfrow = c(1, 2))
+plot(CLIMM, which = c(1, 4))
+
+##
+#plot residuals for climate herbivory
+
+qqnorm(resid(CLIMR), main = "Normal Q-Q Plot of Residuals: Herbivory", 
+       sub = "Climate Model: Provenance Summer Rainfall", 
+       col = "blue")
+
+qqline(resid(CLIMR), 
+       col = "magenta",        
+       lwd = 2,            
+       lty = 2)
+
+qqnorm(resid(CLIMM), main = "Normal Q-Q Plot of Residuals: Herbivory", 
+       sub = "Climate Model: Provenance Mean Annual Temperature", 
+       col = "blue")
+
+qqline(resid(CLIMM), 
+       col = "magenta",        
+       lwd = 2,            
+       lty = 2)
+
+###################################
+
+#Explore Binomial Data
+library(ggplot2)
+
+ggplot(F_Herb_Les, aes(x=Week, y=Probability)) +
+  geom_point(mapping = aes(Week, SK), col = c("royalblue"))+
+  geom_smooth(mapping = aes(Week, SK), col = c("royalblue")) +
+  geom_point(mapping = aes(Week, ED), col = c("magenta")) +
+  geom_smooth(mapping = aes(Week, ED), col = c("magenta")) +
+  geom_point(mapping = aes(Week, SH), col = c("darkorange")) +
+  geom_smooth(mapping = aes(Week, SH), col = c("darkorange")) +
+  geom_point(mapping = aes(Week, Nec), col = c("tomato")) +
+  geom_smooth(mapping = aes(Week, Nec), col = c("tomato")) +
+  geom_point(mapping = aes(Week, IV), col = c("green3")) +
+  geom_smooth(mapping = aes(Week, IV), col = c("green3")) +
+  geom_point(mapping = aes(Week, Galls), col = c("peru")) +
+  geom_smooth(mapping = aes(Week, Galls), col = c("peru")) +
+  geom_point(mapping = aes(Week, TUN), col = c("skyblue")) +
+  geom_smooth(mapping = aes(Week, TUN), col = c("skyblue")) +
+  geom_point(mapping = aes(Week, CHL), col = c("gold")) +
+  geom_smooth(mapping = aes(Week, CHL), col = c("gold")) 
+
+#Ford2023 binomial data 
+ggplot(F_2023H, aes(x=Week, y=Probability)) +
+  geom_point(mapping = aes(Week, SK), col = c("royalblue"))+
+  geom_smooth(mapping = aes(Week, SK), col = c("royalblue")) +
+  geom_point(mapping = aes(Week, ED), col = c("magenta")) +
+  geom_smooth(mapping = aes(Week, ED), col = c("magenta")) +
+  geom_point(mapping = aes(Week, SH), col = c("darkorange")) +
+  geom_smooth(mapping = aes(Week, SH), col = c("darkorange")) +
+  geom_point(mapping = aes(Week, Nec), col = c("tomato")) +
+  geom_smooth(mapping = aes(Week, Nec), col = c("tomato")) +
+  geom_point(mapping = aes(Week, IV), col = c("green3")) +
+  geom_smooth(mapping = aes(Week, IV), col = c("green3")) +
+  geom_point(mapping = aes(Week, Galls), col = c("peru")) +
+  geom_smooth(mapping = aes(Week, Galls), col = c("peru")) +
+  geom_point(mapping = aes(Week, TUN), col = c("skyblue")) +
+  geom_smooth(mapping = aes(Week, TUN), col = c("skyblue")) +
+  geom_point(mapping = aes(Week, CHL), col = c("gold")) +
+  geom_smooth(mapping = aes(Week, CHL), col = c("gold")) 
+
+#Ford2024 binomial data 
+ggplot(F_2024H, aes(x=Week, y=Probability)) +
+  geom_point(mapping = aes(Week, SK), col = c("royalblue"))+
+  geom_smooth(mapping = aes(Week, SK), col = c("royalblue")) +
+  geom_point(mapping = aes(Week, ED), col = c("magenta")) +
+  geom_smooth(mapping = aes(Week, ED), col = c("magenta")) +
+  geom_point(mapping = aes(Week, SH), col = c("darkorange")) +
+  geom_smooth(mapping = aes(Week, SH), col = c("darkorange")) +
+  geom_point(mapping = aes(Week, Nec), col = c("tomato")) +
+  geom_smooth(mapping = aes(Week, Nec), col = c("tomato")) +
+  geom_point(mapping = aes(Week, IV), col = c("green3")) +
+  geom_smooth(mapping = aes(Week, IV), col = c("green3")) +
+  geom_point(mapping = aes(Week, Galls), col = c("peru")) +
+  geom_smooth(mapping = aes(Week, Galls), col = c("peru")) +
+  geom_point(mapping = aes(Week, TUN), col = c("skyblue")) +
+  geom_smooth(mapping = aes(Week, TUN), col = c("skyblue")) +
+  geom_point(mapping = aes(Week, CHL), col = c("gold")) +
+  geom_smooth(mapping = aes(Week, CHL), col = c("gold")) 
+
+#Ford2025 binomial data 
+ggplot(F_2025H, aes(x=Week, y=Probability)) +
+  geom_point(mapping = aes(Week, SK), col = c("royalblue"))+
+  geom_smooth(mapping = aes(Week, SK), col = c("royalblue")) +
+  geom_point(mapping = aes(Week, ED), col = c("magenta")) +
+  geom_smooth(mapping = aes(Week, ED), col = c("magenta")) +
+  geom_point(mapping = aes(Week, SH), col = c("darkorange")) +
+  geom_smooth(mapping = aes(Week, SH), col = c("darkorange")) +
+  geom_point(mapping = aes(Week, Nec), col = c("tomato")) +
+  geom_smooth(mapping = aes(Week, Nec), col = c("tomato")) +
+  geom_point(mapping = aes(Week, IV), col = c("green3")) +
+  geom_smooth(mapping = aes(Week, IV), col = c("green3")) +
+  geom_point(mapping = aes(Week, Galls), col = c("peru")) +
+  geom_smooth(mapping = aes(Week, Galls), col = c("peru")) +
+  geom_point(mapping = aes(Week, TUN), col = c("skyblue")) +
+  geom_smooth(mapping = aes(Week, TUN), col = c("skyblue")) +
+  geom_point(mapping = aes(Week, CHL), col = c("gold")) +
+  geom_smooth(mapping = aes(Week, CHL), col = c("gold"))
+
+##################################################################################
+#separate out lesion binomial data for clarity
+#Explore Binomial Data
+library(ggplot2)
+
+#herb all yrs
+ggplot(F_ALL, aes(x=Week, y=Probability)) +
+  geom_point(mapping = aes(Week, SK), col = c("cornflowerblue")) +
+  geom_smooth(mapping = aes(Week, SK), col = c("cornflowerblue"),linewidth = 2) +
+  geom_point(mapping = aes(Week, ED), col = c("magenta")) +
+  geom_smooth(mapping = aes(Week, ED), col = c("magenta"),linewidth = 2) +
+  geom_point(mapping = aes(Week, SH), col = c("navy")) +
+  geom_smooth(mapping = aes(Week, SH), col = c("navy"),linewidth = 2) +
+  geom_point(mapping = aes(Week, Galls), col = c("purple")) +
+  geom_smooth(mapping = aes(Week, Galls), col = c("purple"),linewidth = 2) +
+  geom_point(mapping = aes(Week, TUN), col = c("darkslategray2")) +
+  geom_smooth(mapping = aes(Week, TUN), col = c("darkslategray2"),linewidth = 2) 
+
+#lesions all yrs
+ggplot(F_ALL, aes(x=Week, y=Probability)) +
+  geom_point(mapping = aes(Week, Nec), col = c("tomato")) +
+  geom_smooth(mapping = aes(Week, Nec), col = c("tomato"),linewidth = 2) +
+  geom_point(mapping = aes(Week, CHL), col = c("gold")) +
+  geom_smooth(mapping = aes(Week, CHL), col = c("gold"), linewidth = 2) +
+  geom_point(mapping = aes(Week, IV), col = c("red4")) +
+  geom_smooth(mapping = aes(Week, IV), col = c("red4"), linewidth = 2) 
+  
+#Ford2023 binomial data Herb 
+ggplot(F_2023H, aes(x=Week, y=Probability)) +
+  geom_point(mapping = aes(Week, SK), col = c("cornflowerblue")) +
+  geom_smooth(mapping = aes(Week, SK), col = c("cornflowerblue"),linewidth = 2) +
+  geom_point(mapping = aes(Week, ED), col = c("magenta")) +
+  geom_smooth(mapping = aes(Week, ED), col = c("magenta"),linewidth = 2) +
+  geom_point(mapping = aes(Week, SH), col = c("navy")) +
+  geom_smooth(mapping = aes(Week, SH), col = c("navy"),linewidth = 2) +
+  geom_point(mapping = aes(Week, Galls), col = c("purple")) +
+  geom_smooth(mapping = aes(Week, Galls), col = c("purple"),linewidth = 2) +
+  geom_point(mapping = aes(Week, TUN), col = c("darkslategray2")) +
+  geom_smooth(mapping = aes(Week, TUN), col = c("darkslategray2"),linewidth = 2) 
+
+#2023 lesions
+ggplot(F_2023H, aes(x=Week, y=Probability)) +
+  geom_point(mapping = aes(Week, Nec), col = c("tomato")) +
+  geom_smooth(mapping = aes(Week, Nec), col = c("tomato"),linewidth = 2) +
+  geom_point(mapping = aes(Week, CHL), col = c("gold")) +
+  geom_smooth(mapping = aes(Week, CHL), col = c("gold"), linewidth = 2) +
+  geom_point(mapping = aes(Week, IV), col = c("red4")) +
+  geom_smooth(mapping = aes(Week, IV), col = c("red4"), linewidth = 2) 
+
+#Ford2024 binomial data HERB
+
+ggplot(F_2024H, aes(x=Week, y=Probability)) +
+  geom_point(mapping = aes(Week, SK), col = c("cornflowerblue")) +
+  geom_smooth(mapping = aes(Week, SK), col = c("cornflowerblue"),linewidth = 2) +
+  geom_point(mapping = aes(Week, ED), col = c("magenta")) +
+  geom_smooth(mapping = aes(Week, ED), col = c("magenta"),linewidth = 2) +
+  geom_point(mapping = aes(Week, SH), col = c("navy")) +
+  geom_smooth(mapping = aes(Week, SH), col = c("navy"),linewidth = 2) +
+  geom_point(mapping = aes(Week, Galls), col = c("purple")) +
+  geom_smooth(mapping = aes(Week, Galls), col = c("purple"),linewidth = 2) +
+  geom_point(mapping = aes(Week, TUN), col = c("darkslategray2")) +
+  geom_smooth(mapping = aes(Week, TUN), col = c("darkslategray2"),linewidth = 2) 
+
+#2024 lesion
+ggplot(F_2024H, aes(x=Week, y=Probability)) +
+  geom_point(mapping = aes(Week, Nec), col = c("tomato")) +
+  geom_smooth(mapping = aes(Week, Nec), col = c("tomato"),linewidth = 2) +
+  geom_point(mapping = aes(Week, CHL), col = c("gold")) +
+  geom_smooth(mapping = aes(Week, CHL), col = c("gold"), linewidth = 2) +
+  geom_point(mapping = aes(Week, IV), col = c("red4")) +
+  geom_smooth(mapping = aes(Week, IV), col = c("red4"), linewidth = 2) 
+
+#Ford2025 binomial data HERB
+ggplot(F_2025H, aes(x=Week, y=Probability)) +
+  geom_point(mapping = aes(Week, SK), col = c("cornflowerblue")) +
+  geom_smooth(mapping = aes(Week, SK), col = c("cornflowerblue"),linewidth = 2) +
+  geom_point(mapping = aes(Week, ED), col = c("magenta")) +
+  geom_smooth(mapping = aes(Week, ED), col = c("magenta"),linewidth = 2) +
+  geom_point(mapping = aes(Week, SH), col = c("navy")) +
+  geom_smooth(mapping = aes(Week, SH), col = c("navy"),linewidth = 2) +
+  geom_point(mapping = aes(Week, Galls), col = c("purple")) +
+  geom_smooth(mapping = aes(Week, Galls), col = c("purple"),linewidth = 2) +
+  geom_point(mapping = aes(Week, TUN), col = c("darkslategray2")) +
+  geom_smooth(mapping = aes(Week, TUN), col = c("darkslategray2"),linewidth = 2) 
+
+#2025 lesion
+ggplot(F_2025H, aes(x=Week, y=Probability)) +
+  geom_point(mapping = aes(Week, Nec), col = c("tomato")) +
+  geom_smooth(mapping = aes(Week, Nec), col = c("tomato"),linewidth = 2) +
+  geom_point(mapping = aes(Week, CHL), col = c("gold")) +
+  geom_smooth(mapping = aes(Week, CHL), col = c("gold"), linewidth = 2) +
+  geom_point(mapping = aes(Week, IV), col = c("red4")) +
+  geom_smooth(mapping = aes(Week, IV), col = c("red4"), linewidth = 2) 
+
+#####################################
+#binomial data SK ~ distance group (log regression)
+
+glmSK <- glm(SK ~ Distance_Group, family = binomial, data = F_Herb_Les)
+summary(glmSK)
+
+
+plot_summs(glmSK, scale = TRUE, exp = TRUE)
+
+library(performance)
+citation("performance")
+library(jtools)
+citation("jtools")
+
+check_model(glmSK)
+
+###########################################
+#binomial data ED ~ distance group
+
+glmED <- glm(ED~ Distance_Group, family = binomial, data = F_ALL)
+summary(glmED)
+
+
+plot_summs(glmED, scale = TRUE, exp = TRUE)
+
+library(performance)
+
+check_model(glmED)
+
+###########################################
+#binomial data IV ~ distance group
+
+glmIV <- glm(IV~ Distance_Group, family = binomial, data = F_ALL)
+summary(glmIV)
+
+
+plot_summs(glmIV, scale = TRUE, exp = TRUE)
+
+
+library(performance)
+
+check_model(glmIV)
+
+###########################################
+#binomial data shot holes~ distance group
+
+glmSH <- glm(SH~ Distance_Group, family = binomial, data = F_ALL)
+summary(glmSH)
+
+
+plot_summs(glmSH, scale = TRUE, exp = TRUE)
+
+library(performance)
+
+check_model(glmSH)
+###########################################
+#binomial data necrosis~ distance group
+
+glmNec <- glm(Nec~ Distance_Group, family = binomial, data = F_ALL)
+summary(glmNec)
+
+
+plot_summs(glmNec, scale = TRUE, exp = TRUE)
+
+library(performance)
+
+check_model(glmNec)
+
+###########################################
+#binomial data galls~ distance group
+
+glmGalls <- glm(Galls~ Distance_Group, family = binomial, data = F_ALL)
+summary(glmGalls)
+
+
+plot_summs(glmGalls, scale = TRUE, exp = TRUE)
+
+library(performance)
+
+check_model(glmGalls)
+
+###########################################
+#binomial data chlorosis~ distance group
+
+glmCHL <- glm(CHL~ Distance_Group, family = binomial, data = F_ALL)
+summary(glmCHL)
+
+
+plot_summs(glmCHL, scale = TRUE, exp = TRUE)
+
+library(performance)
+
+check_model(glmCHL)
+
+###########################################
+#binomial data tunnel~ distance group
+
+glmTUN <- glm(TUN~ Distance_Group, family = binomial, data = F_ALL)
+summary(glmTUN)
+
+
+plot_summs(glmTUN, scale = TRUE, exp = TRUE)
+
+library(performance)
+
+check_model(glmTUN)
+
+########################################
+
+#binomial data tunnel~ distance group
+
+glmSK <- glm(SK~ Distance_Group, family = binomial, data = F_ALL)
+summary(glmSK)
+
+
+plot_summs(glmSK, scale = TRUE, exp = TRUE)
+
+library(performance)
+
+check_model(glmSK)
+##########################################################################################
+#Binomial data by YEARS
+########################################################################
+#binomial data SK ~ years
+
+glmSK <- glm(SK ~ YR, family = binomial, data = F_ALLy)
+summary(glmSK)
+
+
+plot_summs(glmSK, scale = TRUE, exp = TRUE)
+
+library(performance)
+
+check_model(glmSK)
+
+###########################################
+#binomial data ED ~ years
+
+glmED <- glm(ED~ YR, family = binomial, data = F_ALLy)
+summary(glmED)
+
+
+plot_summs(glmED, scale = TRUE, exp = TRUE)
+
+library(performance)
+
+check_model(glmED)
+
+###########################################
+#binomial data IV ~ years
+
+glmIV <- glm(IV~ YR, family = binomial, data = F_ALLy)
+summary(glmIV)
+
+
+plot_summs(glmIV, scale = TRUE, exp = TRUE)
+
+library(performance)
+
+check_model(glmIV)
+
+###########################################
+#binomial data shot holes~ years
+
+glmSH <- glm(SH~ YR, family = binomial, data = F_ALLy)
+summary(glmSH)
+
+
+plot_summs(glmSH, scale = TRUE, exp = TRUE)
+
+library(performance)
+
+check_model(glmSH)
+###########################################
+#binomial data necrosis~ years
+
+glmNec <- glm(Nec~ YR, family = binomial, data = F_ALLy)
+summary(glmNec)
+
+
+plot_summs(glmNec, scale = TRUE, exp = TRUE)
+
+library(performance)
+
+check_model(glmNec)
+
+###########################################
+#binomial data galls~ years
+
+glmGalls <- glm(Galls~ YR, family = binomial, data = F_ALLy)
+summary(glmGalls)
+
+
+plot_summs(glmGalls, scale = TRUE, exp = TRUE)
+
+library(performance)
+
+check_model(glmGalls)
+
+###########################################
+#binomial data chlorosis~ years
+
+glmCHL <- glm(CHL~ YR, family = binomial, data = F_ALLy)
+summary(glmCHL)
+
+
+plot_summs(glmCHL, scale = TRUE, exp = TRUE)
+
+library(performance)
+
+check_model(glmCHL)
+
+###########################################
+#binomial data tunnel~ years
+
+glmTUN <- glm(TUN~ YR, family = binomial, data = F_ALLy)
+summary(glmTUN)
+
+
+plot_summs(glmTUN, scale = TRUE, exp = TRUE)
+
+library(performance)
+
+check_model(glmTUN)
+###########################################
+#plot blocks and damage scores by location 
+
+library(ggplot2)
+library(viridis)
+library(dplyr)
+
+plot_map_d$Letters <- as.factor(plot_map_d$Letters)
+
+plot_map_d <- plot_map_d%>%
+  mutate(
+    Year = as.numeric(format(as.Date(Date), "%Y"))
+  )
+
+
+plot_filtered <- plot_map_d %>%
+  filter(Year == 2024 & Letters %in% selected_blocks) %>%
+  mutate(Date_Factor = as.factor(Date))
+
+#Plot herbivory
+
+selected_blocks <- c("A", "B", "C", "D", "E", "F")
+selected_blocks <- c("G", "H", "I", "J", "K", "L")
+selected_blocks <- c("M", "N", "O", "P", "Q", "R")
+selected_blocks <- c("S", "T", "U", "V", "W", "X")
+selected_blocks <- c("Y", "Z", "ZZ")
+
+plot_filtered <- plot_map_d %>%
+  filter(Year == 2023 & Letters %in% selected_blocks) %>%
+  mutate(Date_Factor = as.factor(Date))
+
+plot_filtered <- plot_map_d %>%
+  filter(Year == 2024 & Letters %in% selected_blocks) %>%
+  mutate(Date_Factor = as.factor(Date))
+
+plot_filtered <- plot_map_d %>%
+  filter(Year == 2025 & Letters %in% selected_blocks) %>%
+  mutate(Date_Factor = as.factor(Date))
+
+
+#Plot 
+ggplot(plot_filtered, aes(x = Date_Factor, y = as.factor(Numbers))) +  
+  geom_tile(aes(fill = Herb_score), color = "white", linewidth = 0.1) +
+  
+  scale_fill_viridis_c(option = "viridis", name = "Herbivory (%)") +
+  facet_wrap(~ Letters, 
+             ncol = 3, 
+             scales = "free", 
+             strip.position = "bottom") +
+  
+  theme_minimal() +
+  labs(
+    x = "", 
+    y = "Tree ID"
+  ) +
+  theme(
+    strip.placement = "outside",
+    strip.background = element_rect(fill = "gray90", color = "black"),
+    strip.text = element_text(face = "bold"),
+    panel.spacing.y = unit(1.5, "lines"), 
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 1),
+    legend.position = "top",
+    panel.grid = element_blank()
+  )
+
+################
+#plot lesions
+
+selected_blocks <- c("A", "B", "C", "D", "E", "F")
+selected_blocks <- c("G", "H", "I", "J", "K", "L")
+selected_blocks <- c("M", "N", "O", "P", "Q", "R")
+selected_blocks <- c("S", "T", "U", "V", "W", "X")
+selected_blocks <- c("Y", "Z", "ZZ")
+
+plot_filtered <- plot_map_d %>%
+  filter(Year == 2023 & Letters %in% selected_blocks) %>%
+  mutate(Date_Factor = as.factor(Date))
+
+plot_filtered <- plot_map_d %>%
+  filter(Year == 2024 & Letters %in% selected_blocks) %>%
+  mutate(Date_Factor = as.factor(Date))
+
+plot_filtered <- plot_map_d %>%
+  filter(Year == 2025 & Letters %in% selected_blocks) %>%
+  mutate(Date_Factor = as.factor(Date))
+
+
+#Plot 
+ggplot(plot_filtered, aes(x = Date_Factor, y = as.factor(Numbers))) +  
+  geom_tile(aes(fill = Lesion_score), color = "white", linewidth = 0.1) +
+  
+  scale_fill_viridis_c(option = "viridis", name = "Lesions (%)") +
+  facet_wrap(~ Letters, 
+             ncol = 3, 
+             scales = "free", 
+             strip.position = "bottom") +
+  
+  theme_minimal() +
+  labs(
+    x = "", 
+    y = "Tree ID"
+  ) +
+  theme(
+    strip.placement = "outside",
+    strip.background = element_rect(fill = "gray90", color = "black"),
+    strip.text = element_text(face = "bold"),
+    panel.spacing.y = unit(1.5, "lines"), 
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(),
+    
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 1),
+    legend.position = "top",
+    panel.grid = element_blank()
+  )
+
+
+
