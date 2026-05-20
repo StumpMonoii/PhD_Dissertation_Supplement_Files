@@ -8,3 +8,5 @@ Mono-ii is a sumo term for when the result of a match is questioned (always ques
     All data in Excel from 2023-2025 ("F_Herb-Les")
     Truncated herbivory and lesion data in Excel from 2023-2025 with common garden block location for heat maps ("plot-map-d")
   
+Yearly data: 
+Weather data and graphs for the Upper Peninsula Ford Center and Forest (from 1958-2025) and the Lower Peninsula Kellogg Experimental Forest (from 1949-2025) 
