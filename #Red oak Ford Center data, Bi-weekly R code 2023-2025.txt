@@ -1,4 +1,5 @@
 #Red oak Ford Center data, all bi-weekly study years (2023-2025).
+
 data = F_Herb_Les
 library(tidyverse)
 citation ("tidyverse")
@@ -19,39 +20,7 @@ citation ("numDeriv")
 library(broom)
 citation("broom")
 
-#data viz
-#herb score by year 
-ggplot(F_Herb_Les) + 
-  geom_point(mapping = aes(Date, Herb_score)) +
-  geom_smooth(mapping = aes(Date, Herb_score))
-
-ggplot(F_Herb_Les, aes(Date, Herb_score)) +
-  geom_point(color = "navy", alpha = 0.4, size = 1.5) +
-  geom_smooth(color = "magenta", fill = "pink", linewidth = 1.2) +
-  labs(
-    x = "Date",
-    y = "Herbivory Score (%)",
-  ) +
-  theme_minimal()
-
-#lesion score by year 
-ggplot(F_Herb_Les) + 
-  geom_point(mapping = aes(Date, Lesion_score)) +
-  geom_smooth(mapping = aes(Date, Lesion_score))
-
-ggplot(F_Herb_Les, aes(Date, Lesion_score)) +
-  geom_point(color = "navy", alpha = 0.4, size = 1.5) +
-  geom_smooth(color = "magenta", fill = "pink", linewidth = 1.2) +
-  labs(
-    x = "Date",
-    y = "Lesion Score (%)",
-  ) +
-  theme_minimal()
-
-#Insect number by distance from Ford Center
-ggplot(F_Herb_Les) + 
-  geom_point(mapping = aes(Distance_Ford, Insect_num)) +
-  geom_smooth(mapping = aes(Distance_Ford, Insect_num))
+#data visualization
 
 #Herbivory score by distance from Ford Center
 ggplot(F_Herb_Les) + 
@@ -61,6 +30,11 @@ ggplot(F_Herb_Les) +
 #Lesion score by distance from Ford Center
 ggplot(F_Herb_Les) + 
   geom_point(mapping = aes(Distance_Ford, Lesion_score, colour = MAT, size = IndivFam)) +
+  geom_smooth(mapping = aes(Distance_Ford, Lesion_score))
+
+#Lesion score by distance from Ford Center
+ggplot(F_Herb_Les) + 
+  geom_point(mapping = aes(Distance_Ford, Lesion_score)) +
   geom_smooth(mapping = aes(Distance_Ford, Lesion_score))
 
 #Boxplot of Distance vs Herbivory score
@@ -95,8 +69,18 @@ corr2 <- corrplot(correlations2, order="hclust",  tl.col = "black",  col=pal)
 
  corr1 + corr2
   plot_layout(ncol = 2)
-##############
 
+#################################################################################################
+ggplot(F_Herb_Les, aes(Herb_score, TreeID, fill = Herb_score)) +
+  geom_tile(color = "pink") +
+  scale_fill_gradient(low = "lightblue", high = "darkblue") +
+  labs(title = "Heatmap with geom_tile",
+       x = "X",
+       y = "Y",
+       fill = "Value") +
+  theme_minimal()
+
+#HERBIVORY##############################################################################################
 #Investigate Herbivory
 #herbivory is response variable 
 
@@ -107,17 +91,19 @@ hist(F_Herb_Les$Herb_score, main = "Herbivory Score, Ford Center, 2023-2025", xl
 summary(F_Herb_Les$Herb_score)
 var(F_Herb_Les$Herb_score)
 
-shapiro.test(F_Herb_Les$Herb_score)
 
-####
-#lesions
 hist(F_Herb_Les$Lesion_score, main = "Lesion Score, Ford Center, 2023-2025", xlab = "Lesion Score (%)", col = "skyblue3", border = "black")
 summary(F_Herb_Les$Lesion_score)
 var(F_Herb_Les$Lesion_score)
 
+
+shapiro.test(F_Herb_Les$Herb_score)
+
 shapiro.test(F_Herb_Les$Lesion_score)
 
-##############################
+####################################################################################################
+#######################################################################################################
+
 #Models
 #convert % to value between 0 and 1 for betareg models
 
@@ -126,11 +112,26 @@ F_Herb_Les$HerbPerct = F_Herb_Les$Herb_score/ (100)
 
 F_Herb_Les$LesPerct = F_Herb_Les$Lesion_score/ (100)
 
+#override F_Herb_Les (Separate Julian date into year and 3-digit Julian date) 
+F_Herb_Les <- F_Herb_Les %>% 
+  separate(J_Date,into=c("year", "J_Date"), sep=2, convert=TRUE) 
+
 summary(F_Herb_Les)
 
-#####################
+#build null models using this model ex: betareg(prop ~ x1 + x2, data = dat)
 #null herbivory
-nullmodelH <- betareg(HerbPerct ~ 1, data = F_Herb_Les)
+
+F_Herb_Les$HerbPerct <- as.numeric(as.character(F_Herb_Les$HerbPerct))
+
+n<- nrow(F_Herb_Les)
+
+F_Herb_Les$HerbPerct_Transformed <- (F_Herb_Les$HerbPerct * (n - 1) + 0.5) / n
+
+F_Herb_Les$Year <- as.factor(F_Herb_Les$Year)
+F_Herb_Les$Distance_Group <- as.factor(F_Herb_Les$Distance_Group)
+
+
+nullmodelH <- betareg(HerbPerct_Transformed ~ 1, data = F_Herb_Les)
 summary(nullmodelH)
 
 #predict mean Herbivory
@@ -148,7 +149,12 @@ cat("Predicted Variance Herbivory:", new_pred_H, "\n")
 #Predicted Variance Herbivory: 0.02353244 
 
 #null lesions
-nullmodelL <- betareg(LesPerct ~ 1, data = F_Herb_Les)
+
+n<- nrow(F_Herb_Les)
+
+F_Herb_Les$LesPerct_Transformed <- (F_Herb_Les$LesPerct * (n - 1) + 0.5) / n
+
+nullmodelL <- betareg(LesPerct_Transformed ~ 1, data = F_Herb_Les)
 summary(nullmodelL)
 
 #Predict mean Lesions
@@ -163,26 +169,24 @@ new_obs <- data.frame(dummy = 1)
 cat("Predicted Variance Lesions:", new_pred_L, "\n")
 #Predicted Variance Lesions: 0.01448134 
 
-#prep herbivory and lesions from 0-1 for betareg models
+#####################################################################################################
+#prep herbivory and lesions from 0-1 continuous scoring for betareg models
 
 F_Herb_Les$HerbPerct = F_Herb_Les$Herb_score/ (100)
 
 F_Herb_Les$LesPerct = F_Herb_Les$Lesion_score/ (100)
 
-#override F_Herb_Les
-F_Herb_Les <- F_Herb_Les %>% 
-  separate(J_Date,into=c("year", "J_Date"), sep=2, convert=TRUE) 
-
 ####
 
 #y~ day model for effect over time for herbivory
-DAY <- betareg(HerbPerct ~ J_Date, data = F_Herb_Les)
+DAY <- betareg(HerbPerct_Transformed ~ J_Date, data = F_Herb_Les)
 summary(DAY)
 
-#add in year as factor to create a line for each year
-model_all_h <- betareg(HerbPerct ~ J_Date * as.factor(Year), data = F_Herb_Les)
+#add in year
+model_all_h <- betareg(HerbPerct_Transformed ~ J_Date * as.factor(Year), data = F_Herb_Les)
+summary(model_all_h)
 
-# Make a prediction grid
+# Create a "prediction grid" - dummy dataset covering the range of your dates for each year.
 pred_grid <- expand.grid(
   J_Date = seq(min(F_Herb_Les$J_Date), max(F_Herb_Les$J_Date), length.out = 100),
   Year = unique(F_Herb_Les$Year)
@@ -206,29 +210,71 @@ ggplot(F_Herb_Les, aes(x = J_Date, y = HerbPerct, color = as.factor(Year))) +
     fill = "Year"
   )
 
-summary(model_all_h)
+#with facet wrap 
+ggplot(F_Herb_Les, aes(x = J_Date, y = HerbPerct_Transformed, color = as.factor(Year))) +
+  geom_point(alpha = 0.4, shape = 21, aes(fill = as.factor(Year)), color = "black") + 
+  geom_line(data = pred_grid, aes(y = HerbPerct_pred, group = as.factor(Year)), linewidth = 1.2) +
+  scale_color_viridis_d(option = "viridis", name = "Year") +
+  scale_fill_viridis_d(option = "viridis", name = "Year") +
+  facet_wrap(~ Year) +
+  theme_minimal() +
+  labs(
+    title = "Herbivory by Year",
+    x = "Julian Date",
+    y = "Herbivory (%)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    panel.grid.minor = element_blank(),
+    legend.position = "right",
+    strip.background = element_rect(
+      color = "gray30", 
+      fill = "gray95", 
+      linewidth = 1
+    ),
+    strip.text = element_text(
+      face = "bold", 
+      color = "black", 
+      size = 11, 
+      margin = margin(5,5,5,5)
+    ),
+    panel.border = element_rect(
+      color = "gray75", 
+      fill = NA, 
+      linewidth = 0.8
+    )
+  )
+
+
 
 #make summary more easily readable
 library(broom)
 
 model_table_h <- tidy(model_all_h)
-####################
 
+# add R-squared and AIC (model fit stats)
+model_fit <- glance(model_all_h)
+
+print(model_table_h)
+
+##########################
 #same for lesions
 
 #y~ day model for effect over time for lesions
-DAY <- betareg(LesPerct ~ J_Date, data = F_Herb_Les)
-summary(DAY)
+DAYL <- betareg(LesPerct_Transformed ~ J_Date, data = F_Herb_Les)
+summary(DAYL)
 
-#add in year as factor to create a line for each year
-model_all_l <- betareg(LesPerct ~ J_Date * as.factor(Year), data = F_Herb_Les)
+#add in year as factor 
+model_all_l <- betareg(LesPerct_Transformed ~ J_Date * as.factor(Year), data = F_Herb_Les)
+summary(model_all_l)
 
-# Make prediction grid
+# Create a "prediction grid" - dummy dataset covering the range of your dates for each year.
 pred_grid <- expand.grid(
   J_Date = seq(min(F_Herb_Les$J_Date), max(F_Herb_Les$J_Date), length.out = 100),
   Year = unique(F_Herb_Les$Year)
 )
 
+#model to predict HerbPerct 
 pred_grid$LesPerct_pred <- predict(model_all_l, newdata = pred_grid)
 
 #Plot both points and the predicted lines
@@ -246,23 +292,173 @@ ggplot(F_Herb_Les, aes(x = J_Date, y = LesPerct, color = as.factor(Year))) +
     fill = "Year"
   )
 
+
+#with facet wrap 
+ggplot(F_Herb_Les, aes(x = J_Date, y = LesPerct, color = as.factor(Year))) +
+  geom_point(alpha = 0.4, shape = 21, aes(fill = as.factor(Year)), color = "black") + 
+  geom_line(data = pred_grid, aes(y = LesPerct_pred, group = as.factor(Year)), linewidth = 1.2) +
+  scale_color_viridis_d(option = "viridis", name = "Year") +
+  scale_fill_viridis_d(option = "viridis", name = "Year") +
+  facet_wrap(~ Year) +
+  theme_minimal() +
+  labs(
+    title = "Lesions by Year",
+    x = "Julian Date",
+    y = "Lesions (%)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    panel.grid.minor = element_blank(),
+    legend.position = "right",
+    strip.background = element_rect(
+      color = "gray30", 
+      fill = "gray95", 
+      linewidth = 1
+    ),
+    strip.text = element_text(
+      face = "bold", 
+      color = "black", 
+      size = 11, 
+      margin = margin(5,5,5,5)
+    ),
+    panel.border = element_rect(
+      color = "gray75", 
+      fill = NA, 
+      linewidth = 0.8
+    )
+  )
+
 summary(model_all_l)
+
+#make summary more easily readable
+library(broom)
+
 model_table_l <- tidy(model_all_l)
 
+# add R-squared and AIC (model fit stats)
+model_fit <- glance(model_all_l)
+
+print(model_table_l)
+
+################
 #check models against null model: Herbivory
 library(lmtest)
 citation("lmtest")
 
 lrtest(nullmodelH, model_all_h)
-#plot residuals vs indices and residuals vs linear predictor
+#Likelihood ratio test
+
 par(mfrow = c(1, 2))
 plot(model_all_h, which = c(1, 4))
 
+##########################
+
+#check models against null model: Lesions
+library(lmtest)
+citation("lmtest")
+
 lrtest(nullmodelL, model_all_l)
+#Likelihood ratio test
+
+#Model 1: LesPerct ~ 1
+#Model 2: LesPerct ~ J_Date
+#Df LogLik Df  Chisq Pr(>Chisq)    
+#1   3 551.15                         
+#2   8 702.97  5 303.63  < 2.2e-16 ***
+
+#  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
 #plot residuals vs indices and residuals vs linear predictor
 par(mfrow = c(1, 2))
 plot(model_all_l, which = c(1, 4))
 
+##########
+#predict new data
+#818 days in real data set 
+
+#new date set
+new_days <- data.frame(J_Date = seq(1, 1200, by = 1))
+
+predictions <- predict(DAY, newdata = new_days, type = "response")
+
+predicted_h <- data.frame(J_Date = new_days$J_Date, 
+                             Pred_Herb = predictions)
+#predict
+head(predicted_h)
+tail(predicted_h)
+
+#plot
+ggplot(predicted_data, aes(J_Date, Pred_Herb)) +
+  geom_line(color = "navy", linewidth = 1) +
+  geom_point(data = F_Herb_Les, aes(J_Date, HerbPerct), color="slateblue", alpha = 0.2) +
+  labs(title = "Herbivory Prediction to Day 1200",
+       x = "Julian Date",
+       y = "Herbivory (0-1)") +
+  theme_minimal()
+
+##############################################
+
+# Predict Lesions means
+#predict new data
+#818 days in real data set 
+
+#new date set
+new_days <- data.frame(J_Date = seq(1, 1200, by = 1))
+
+predictionsl <- predict(DAYL, newdata = new_days, type = "response")
+
+predicted_l <- data.frame(J_Date = new_days$J_Date, 
+                          Pred_Lesion = predictionsl)
+#predict
+head(predicted_l)
+tail(predicted_l)
+
+#plot
+ggplot(predicted_l, aes(J_Date, Pred_Lesion)) +
+  geom_line(color = "navy", linewidth = 1) +
+  geom_point(data = F_Herb_Les, aes(J_Date, LesPerct), color="slateblue", alpha = 0.2) +
+  labs(title = "Lesion Prediction to Day 1200",
+       x = "Julian Date",
+       y = "Lesion (0-1)") +
+  theme_minimal()
+
+
+#########
+#alt method
+new_dates$pred_Lesion <- predict(DAYL, newdata = new_dates, type = "response")
+
+#predict on the link scale (logit) Lesions
+pred_link <- predict(DAYL, newdata = new_dates, type = "link")
+
+library(emmeans)
+# means and CIs for specific Julian Dates
+Les_means <- emmeans(DAYL, ~ J_Date, at = list(J_Date = c(100, 150, 200, 250, 500, 700, 800, 900, 1000, 1100, 1200)), 
+                     type = "response")
+print(Les_means)
+
+
+ggplot() +
+  geom_point(
+   data = F_Herb_Les, 
+    aes(J_Date, LesPerct), 
+    color = "slateblue",   
+    alpha = 0.4
+  ) +
+  geom_line(
+    data=new_dates, 
+    aes(J_Date, pred_Lesion), 
+    color = "navy", 
+    linewidth = 1.2
+  ) +
+  labs(
+    title = "Lesion Progression Over Time",
+    subtitle = "Predicted trend using Beta Regression (818-day span)",
+    x = "Time (Julian Date)",
+    y = "Lesion Proportion (0 - 1)"
+  ) +
+  theme_minimal()
+
+################
 #plot residuals with Q-Q for day models
 qqnorm(resid(DAY), main = "Normal Q-Q Plot of Residuals: Herbivory", 
        sub = "Day Model", 
@@ -282,10 +478,11 @@ qqline(resid(DAYL),
        lwd = 2,            
        lty = 2)
 
-########################33
+##################################################################################
+
 #y ~ Geography model for herbivory
 
-GEO_h <- betareg(HerbPerct ~ Distance_Group + J_Date * as.factor(Year), 
+GEO_h <- betareg(HerbPerct_Transformed ~ Distance_Group + J_Date * as.factor(Year), 
                            data = F_Herb_Les)
 
 summary(GEO_h)
@@ -309,9 +506,37 @@ full_pred_grid <- expand.grid(
 
 full_pred_grid$Herb_Pred <- predict(GEO_h, newdata = full_pred_grid)
 
-#try slopes instead 
+# Plot with Facets
+ggplot(F_Herb_Les, aes(x = J_Date, y = HerbPerct, color = as.factor(Year))) +
+  geom_point(alpha = 0.6) +
+  geom_line(data = full_pred_grid, aes(y = Herb_Pred), size = 1) +
+  facet_wrap(~Distance_Group) +
+  theme_bw()
+ggplot(F_Herb_Les, aes(x = J_Date, y = HerbPerct)) +
+  geom_point(aes(fill = as.factor(Year)), shape = 21, 
+             color = "black", stroke = 0.5, alpha = 0.4, size = 1.8) +
+  geom_line(data = full_pred_grid, 
+            aes(y = Herb_Pred, group = as.factor(Year), color = as.factor(Year)), 
+            linewidth = 1) +
+  facet_wrap(~ Distance_Group) +
+  scale_fill_viridis_d(option = "viridis", name = "Observation Year") +
+  scale_color_viridis_d(option = "viridis", name = "Observation Year") +
+  theme_bw() +
+  labs(
+    x = "Julian Date (Day of Year)",
+    y = "Herbivory Score (%)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    panel.grid.minor = element_blank(),
+    legend.position = "right",
+    strip.background = element_rect(color = "gray30", fill = "gray95", linewidth = 1),
+    strip.text = element_text(face = "bold", color = "black", size = 11, margin = margin(5,5,5,5))
+  )
 
-GEO_slope_model <- betareg(HerbPerct ~ J_Date * Distance_Group * as.factor(Year), 
+
+#different method by year facets with more detail for distance groups
+GEO_slope_model <- betareg(HerbPerct_Transformed ~ J_Date * Distance_Group * as.factor(Year), 
                            data = F_Herb_Les)
 
 pred_grid_slopes <- expand.grid(
@@ -323,9 +548,9 @@ pred_grid_slopes <- expand.grid(
 # Predict herbivory 
 pred_grid_slopes$Herb_Pred <- predict(GEO_slope_model, newdata = pred_grid_slopes)
 
-ggplot(F_Herb_Les, aes(x = J_Date, y = HerbPerct, color = Distance_Group)) +
+ggplot(F_Herb_Les, aes(x = J_Date, y = HerbPerct_Transformed, color = Distance_Group)) +
   geom_point(alpha = 0.2, size = 1) + 
-  geom_line(data = pred_grid_slopes, aes(y = Herb_Pred), size = 1.2) +
+  geom_line(data = pred_grid_slopes, aes(y = Herb_Pred), linewidth = 1.2) +
   facet_wrap(~ Year) +
   scale_color_viridis_d(option = "turbo") +
   theme_minimal() +
@@ -335,23 +560,140 @@ ggplot(F_Herb_Les, aes(x = J_Date, y = HerbPerct, color = Distance_Group)) +
     y = "Herbivory (%)",
     color = "Distance Group"
   ) +
-  theme(legend.position = "bottom")
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    panel.grid.minor = element_blank(),
+    legend.position = "right",
+    panel.border = element_rect(
+      color = "gray30",      
+      fill = NA,            
+      linewidth = 1          
+    ),
+    strip.background = element_rect(color = "gray30", fill = "gray95", linewidth = 1),
+    strip.text = element_text(face = "bold", color = "black", size = 11, margin = margin(5,5,5,5))
+  )
 
 
 summary(GEO_slope_model)
 
+#make summary more easily readable
+library(broom)
+
+model_table_geoslp <- tidy(GEO_slope_model)
+
+# add R-squared and AIC (model fit stats)
+model_fit <- glance(GEO_slope_model)
+
+print(model_table_geoslp)
+
+############
+#check models against null model: Herbivory
 library(lmtest)
 citation("lmtest")
 
-lrtest(nullmodelH, GEO_slope_model)
+lrtest(nullmodelH, GEO_h)
 
 #plot residuals vs indices and residuals vs linear predictor
 par(mfrow = c(1, 2))
 plot(GEO_slope_model, which = c(1, 4))
 
 ##############
+#group distance groups
+groups <- unique(F_Herb_Les$Distance_Group)
+
+#Julian date study period
+dates <- seq(min(F_Herb_Les$J_Date, na.rm = TRUE), 
+             1200, 
+             by = 1)
+
+#predict new data 
+new_data_GEO <- expand.grid(Distance_Group = groups, 
+                            J_Date = dates)
+
+new_data_GEO$pred_Herb <- predict(GEO, newdata = new_data_GEO, type = "response")
+summary(new_data_GEO)
+
+#plot
+
+library(viridis)
+
+ggplot() +
+  geom_line(data = new_data_GEO, 
+            aes(J_Date, pred_Herb, color = Distance_Group), 
+            size = 1.2) +
+  geom_jitter(data = F_Herb_Les, 
+             aes(J_Date, HerbPerct, color = Distance_Group), 
+             alpha = 0.4, size = 1.2) +
+  scale_color_viridis_d(option = "turbo") +
+  labs(
+    title = "Herbivory by Distance Group",
+    x = "Julian Date",
+    y = "Herbivory (Proportion (0-1)",
+    color = "Distance Group"
+  ) +
+  theme_minimal()
+
+######################
 #LESIONS
-GEOL_slope_model <- betareg(LesPerct ~ J_Date * Distance_Group * as.factor(Year), 
+
+GEO_l <- betareg(LesPerct_Transformed ~ Distance_Group + J_Date * as.factor(Year), 
+                 data = F_Herb_Les)
+
+summary(GEO_l)
+
+
+pred_grid_geol <- expand.grid(
+  J_Date = seq(min(F_Herb_Les$J_Date), max(F_Herb_Les$J_Date), length.out = 100),
+  Year = unique(F_Herb_Les$Year),
+  Distance_Group = unique(F_Herb_Les$Distance_Group)[1] 
+)
+
+# Predict 
+pred_grid_geol$Les_Pred <- predict(GEO_l, newdata = pred_grid_geol)
+
+# Create a full prediction grid for ALL groups
+full_pred_gridl <- expand.grid(
+  J_Date = seq(min(F_Herb_Les$J_Date), max(F_Herb_Les$J_Date), length.out = 100),
+  Year = unique(F_Herb_Les$Year),
+  Distance_Group = unique(F_Herb_Les$Distance_Group)
+)
+
+full_pred_gridl$Les_Pred <- predict(GEO_l, newdata = full_pred_gridl)
+
+# Plot with Facets
+ggplot(F_Herb_Les, aes(x = J_Date, y = LesPerct, color = as.factor(Year))) +
+  geom_point(alpha = 0.6) +
+  geom_line(data = full_pred_gridl, aes(y = Les_Pred), size = 1) +
+  facet_wrap(~Distance_Group) +
+  theme_bw()
+ggplot(F_Herb_Les, aes(x = J_Date, y = LesPerct)) +
+  geom_point(aes(fill = as.factor(Year)), shape = 21, 
+             color = "black", stroke = 0.5, alpha = 0.4, size = 1.8) +
+  geom_line(data = full_pred_gridl, 
+            aes(y = Les_Pred, group = as.factor(Year), color = as.factor(Year)), 
+            linewidth = 1) +
+  facet_wrap(~ Distance_Group) +
+  scale_fill_viridis_d(option = "viridis", name = "Observation Year") +
+  scale_color_viridis_d(option = "viridis", name = "Observation Year") +
+  theme_bw() +
+  labs(
+    x = "Julian Date (Day of Year)",
+    y = "Lesion Score (%)"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    panel.grid.minor = element_blank(),
+    legend.position = "right",
+    strip.background = element_rect(color = "gray30", fill = "gray95", linewidth = 1),
+    strip.text = element_text(face = "bold", color = "black", size = 11, margin = margin(5,5,5,5))
+  )
+
+
+
+lrtest(nullmodelL, GEO_l)
+
+####
+GEOL_slope_model <- betareg(LesPerct_Transformed ~ J_Date * Distance_Group * as.factor(Year), 
                            data = F_Herb_Les)
 
 pred_grid_slopes <- expand.grid(
@@ -360,10 +702,10 @@ pred_grid_slopes <- expand.grid(
   Distance_Group = unique(F_Herb_Les$Distance_Group)
 )
 
-# Predict herbivory 
+# Predict lesions
 pred_grid_slopes$Les_Pred <- predict(GEOL_slope_model, newdata = pred_grid_slopes)
 
-ggplot(F_Herb_Les, aes(x = J_Date, y = LesPerct, color = Distance_Group)) +
+ggplot(F_Herb_Les, aes(x = J_Date, y = LesPerct_Transformed, color = Distance_Group)) +
   geom_point(alpha = 0.2, size = 1) + 
   geom_line(data = pred_grid_slopes, aes(y = Les_Pred), size = 1.2) +
   facet_wrap(~ Year) +
@@ -377,14 +719,71 @@ ggplot(F_Herb_Les, aes(x = J_Date, y = LesPerct, color = Distance_Group)) +
   ) +
   theme(legend.position = "bottom")
 
+#updated plot
+ggplot(F_Herb_Les, aes(x = J_Date, y = LesPerct_Transformed, color = Distance_Group)) +
+  geom_point(alpha = 0.2, size = 1) + 
+  geom_line(data = pred_grid_slopes, aes(y = Les_Pred), linewidth = 1.2) +
+  facet_wrap(~ Year) +
+  scale_color_viridis_d(option = "turbo") +
+  theme_minimal() +
+  labs(
+    title = "Lesions by Distance Group",
+    x = "Julian Date",
+    y = "Lesions (%)",
+    color = "Distance Group"
+  ) +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    panel.grid.minor = element_blank(),
+    legend.position = "right",
+    panel.border = element_rect(
+      color = "gray30",      
+      fill = NA,            
+      linewidth = 1          
+    ),
+    strip.background = element_rect(color = "gray30", fill = "gray95", linewidth = 1),
+    strip.text = element_text(face = "bold", color = "black", size = 11, margin = margin(5,5,5,5))
+  )
 
-summary(GEOL_slope_model)
-lrtest(nullmodelL, GEOL_slope_model)
+summary(GEO_l)
 
-#plot residuals vs indices and residuals vs linear predictor
 par(mfrow = c(1, 2))
 plot(GEOL_slope_model, which = c(1, 4))
 
+#######
+
+#group distance groups
+groups <- unique(F_Herb_Les$Distance_Group)
+
+#Julian date study period
+dates <- seq(min(F_Herb_Les$J_Date, na.rm = TRUE), 
+             1200, 
+             by = 1)
+
+new_data_GEOL <- expand.grid(Distance_Group = groups, 
+                             J_Date = dates)
+new_data_GEOL$pred_Herb <- predict(GEOL, newdata = new_data_GEOL, type = "response")
+
+summary(new_data_GEOL)
+
+#plot
+ggplot() +
+  geom_line(data = new_data_GEOL, 
+            aes(J_Date, pred_Herb, color = Distance_Group), 
+            size = 1.2) +
+  geom_point(data = F_Herb_Les, 
+             aes(J_Date, HerbPerct, color = Distance_Group), 
+             alpha = 0.7, size = 1.2) +
+  scale_color_viridis_d(option = "turbo") +
+  labs(
+    title = "Lesion Trend by Distance Group",
+    x = "Time (Julian Date)",
+    y = "Lesion Proportion (0-1)",
+    color = "Distance Group"
+  ) +
+  theme_minimal()
+
+################
 #plot residuals using Q-Q
 
 qqnorm(resid(GEO), main = "Normal Q-Q Plot of Residuals: Herbivory", 
@@ -404,12 +803,15 @@ qqline(resid(GEOL),
        col = "magenta",        
        lwd = 2,            
        lty = 2)
-#################
+
+
+##########################################################################################################################
+
 #weather model Herbivory
 
 #weather counts 
 WTHRC <- betareg(
-  HerbPerct ~ (J_Date * as.factor(Year)) + 
+  HerbPerct_Transformed ~ (J_Date * as.factor(Year)) + 
     Rain_14D + Rain_over0.2_14D + Temp_32under_14D + Temp_80over_14D, 
   data = F_Herb_Les
 )
@@ -482,23 +884,31 @@ ggplot(F_Herb_Les, aes(x = J_Date, y = HerbPerct)) +
     color = "Weather Condition"
   )
 
+
+########################################
+#check models against null model: Herbivory
+library(lmtest)
+citation("lmtest")
+
 lrtest(nullmodelH, WTHRC)
+
+
 #plot residuals vs indices and residuals vs linear predictor
 par(mfrow = c(1, 2))
 plot(WTHRC, which = c(1, 4))
 
-#############
+#######
+
 #weather averages
-WTHRA <- betareg(HerbPerct ~ J_Date + Avg_minC_14D + Avg_maxC_14D + Avg_rainMM_14D, 
-                   data = F_Herb_Les)
-summary(WTHRA)
 
 
 WTHRA <- betareg(
-  HerbPerct ~ (J_Date * as.factor(Year)) + 
+  HerbPerct_Transformed ~ (J_Date * as.factor(Year)) + 
     Avg_minC_14D + Avg_maxC_14D + Avg_rainMM_14D, 
   data = F_Herb_Les
 )
+
+summary(WTHRA)
 
 pred_grid_wthra <- expand.grid(
   J_Date = seq(min(F_Herb_Les$J_Date), max(F_Herb_Les$J_Date), length.out = 100),
@@ -528,19 +938,31 @@ ggplot(F_Herb_Les, aes(x = J_Date, y = HerbPerct, color = as.factor(Year))) +
   )
 summary(WTHRA)
 
+
+####################
+##########
+
+#check models against null model: Herbivory
+library(lmtest)
+citation("lmtest")
+
 lrtest(nullmodelH, WTHRA)
+
 #plot residuals vs indices and residuals vs linear predictor
 par(mfrow = c(1, 2))
 plot(WTHRA, which = c(1, 4))
+################################################################
 
-###############
+####################################
 #Lesions weather model
 #weather counts 
 WTHRC <- betareg(
-  LesPerct ~ (J_Date * as.factor(Year)) + 
+  LesPerct_Transformed ~ (J_Date * as.factor(Year)) + 
     Rain_14D + Rain_over0.2_14D + Temp_32under_14D + Temp_80over_14D, 
   data = F_Herb_Les
 )
+
+summary(WTHRC)
 
 pred_grid_wthrc <- expand.grid(
   J_Date = seq(min(F_Herb_Les$J_Date), max(F_Herb_Les$J_Date), length.out = 100),
@@ -563,14 +985,15 @@ ggplot(F_Herb_Les, aes(x = J_Date, y = LesPerct, color = as.factor(Year))) +
   scale_color_viridis_d(option = "viridis") +
   theme_minimal() +
   labs(
-    title = "Lesion Slopes Adjusted for Weather",
+    title = "Lesion Slopes Adjusted for Weather Counts",
     x = "Julian Date",
     y = "Lesions (%)",
     color = "Year",
     fill = "Year"
   )
 summary(WTHRC)
-
+ 
+################
 #use weather as slopes instead (rain) for graph example lesions
 pred_grid_weather <- expand.grid(
   J_Date = seq(min(F_Herb_Les$J_Date, na.rm = TRUE), max(F_Herb_Les$J_Date, na.rm = TRUE), length.out = 100),
@@ -602,16 +1025,27 @@ ggplot(F_Herb_Les, aes(x = J_Date, y = LesPerct)) +
     color = "Weather Condition"
   )
 
+
+##############
+#check models against null model: Lesion counts
+library(lmtest)
+citation("lmtest")
+
 lrtest(nullmodelL, WTHRC)
 
 #plot residuals vs indices and residuals vs linear predictor
 par(mfrow = c(1, 2))
 plot(WTHRC, which = c(1, 4))
 
+#######################
+#Lesions weather model (averages)
+WTHRAL <- betareg(LesPerct_Transformed ~ J_Date + Avg_minC_14D + Avg_maxC_14D + Avg_rainMM_14D, 
+                 data = F_Herb_Les)
+summary(WTHRAL)
 
-####
+################################
 WTHRAL <- betareg(
-  LesPerct ~ (J_Date * as.factor(Year)) + 
+  LesPerct_Transformed ~ (J_Date * as.factor(Year)) + 
     Avg_minC_14D + Avg_maxC_14D + Avg_rainMM_14D, 
   data = F_Herb_Les
 )
@@ -646,13 +1080,19 @@ ggplot(F_Herb_Les, aes(x = J_Date, y = LesPerct, color = as.factor(Year))) +
   )
 summary(WTHRAL)
 
+##################################
+#check models against null model: Herbivory
+library(lmtest)
+citation("lmtest")
+
 lrtest(nullmodelL, WTHRAL)
+
 
 #plot residuals vs indices and residuals vs linear predictor
 par(mfrow = c(1, 2))
-plot(WTHRLC, which = c(1, 4)) 
+plot(WTHRLC, which = c(1, 4))
 
-####
+##################################
 
 #plot residuals
 qqnorm(resid(WTHR), main = "Normal Q-Q Plot of Residuals: Herbivory", 
@@ -673,9 +1113,9 @@ qqline(resid(WTHRL),
        lwd = 2,            
        lty = 2)
 
-####
+####################################################################
 #climate model herbivory
-CLIM <- betareg(HerbPerct ~ J_Date + MAT + RainS, data = F_Herb_Les)
+CLIM <- betareg(HerbPerct_Transformed ~ J_Date + MAT + RainS, data = F_Herb_Les)
 
 summary(CLIM)
 #covariance, break up RainS and MAT into separate models
@@ -683,12 +1123,12 @@ summary(CLIM)
 boxplot(RainS ~ Year, data = F_Herb_Les)
 
 ###################
-CLIMR <- betareg(HerbPerct ~ J_Date *as.factor(Year) + RainS, 
+CLIMR <- betareg(HerbPerct_Transformed ~ J_Date *as.factor(Year) + RainS, 
                        data = F_Herb_Les)
 
 summary(CLIMR)
 
-#####
+
 high_rains <- quantile(F_Herb_Les$RainS, 0.90, na.rm = TRUE)
 low_rains  <- quantile(F_Herb_Les$RainS, 0.10, na.rm = TRUE)
 
@@ -705,7 +1145,6 @@ pred_grid_climr <- expand.grid(
 
 # Predict
 pred_grid_climr$Herb_Pred <- predict(CLIMR, newdata = pred_grid_climr)
-###
 
 #plot all years together
 ggplot(F_Herb_Les, aes(x = J_Date, y = HerbPerct)) +
@@ -724,8 +1163,8 @@ ggplot(F_Herb_Les, aes(x = J_Date, y = HerbPerct)) +
     color = "Provenance Summer Rainfall"
   ) +
   theme(legend.position = "bottom")
-####
-#separate years for more easily readable plots
+
+#separate years
 
 ggplot(F_Herb_Les, aes(x = J_Date, y = HerbPerct)) +
   geom_point(alpha = 0.2, color = "gray50") + 
@@ -742,17 +1181,39 @@ ggplot(F_Herb_Les, aes(x = J_Date, y = HerbPerct)) +
     y = "Herbivory (%)",
     color = "Provenance Summer Rainfall"
   ) +
-  theme(legend.position = "bottom",
-        strip.background = element_rect(fill = "gray90"), 
-        strip.text = element_text(face = "bold"))
+  theme(
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(
+      color = "gray30",       
+      fill = NA,          
+      linewidth = 1         
+    ),
+    strip.background = element_rect(
+      color = "gray30",      
+      fill = "gray90",        
+      linewidth = 1         
+    ), 
+    strip.text = element_text(
+      face = "bold", 
+      color = "black", 
+      size = 11, 
+      margin = margin(5, 5, 5, 5)
+    )
+  )
+
+
+##############
+#check models against null model: Herbivory
+library(lmtest)
+citation("lmtest")
 
 lrtest(nullmodelH, CLIMR)
 
-#plot residuals vs indices and residuals vs linear predictor
 par(mfrow = c(1, 2))
 plot(CLIMR, which = c(1, 4))
 
-#####
+######
 #try for MAT instead
 CLIMM <- betareg(HerbPerct ~ J_Date * as.factor(Year) + MAT, 
                  data = F_Herb_Les)
@@ -782,24 +1243,49 @@ ggplot(F_Herb_Les, aes(x = J_Date, y = HerbPerct)) +
   geom_line(data = pred_grid_climm, 
             aes(y = Herb_Pred, color = MAT_Level), 
             linewidth = 1.2) +
-  facet_wrap(~ Year) +
+  facet_wrap(~ Year) + 
   scale_color_manual(values = c("High MAT" = "magenta", 
                                 "Low MAT" = "navy")) +
-  theme_minimal() +
+  theme_bw() + 
   labs(
     title = "Provenance MAT and Herbivory",
     x = "Julian Date",
     y = "Herbivory (%)",
     color = "MAT"
   ) +
-  theme(legend.position = "bottom")
+  theme(
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(
+      color = "gray30",       
+      fill = NA,          
+      linewidth = 1         
+    ),
+    strip.background = element_rect(
+      color = "gray30",      
+      fill = "gray90",        
+      linewidth = 1         
+    ), 
+    strip.text = element_text(
+      face = "bold", 
+      color = "black", 
+      size = 11, 
+      margin = margin(5, 5, 5, 5)
+    )
+  )
 
+####
+#check models against null model: Herbivory
+library(lmtest)
+citation("lmtest")
 
 lrtest(nullmodelH, CLIMM)
+
+
 par(mfrow = c(1, 2))
 plot(CLIMM, which = c(1, 4))
 
-##
+#################
 #plot residuals for climate herbivory
 
 qqnorm(resid(CLIMR), main = "Normal Q-Q Plot of Residuals: Herbivory", 
@@ -820,7 +1306,197 @@ qqline(resid(CLIMM),
        lwd = 2,            
        lty = 2)
 
-###################################
+#########################################################
+#climate models for lesions
+#RainS
+CLIMRL <- betareg(LesPerct_Transformed ~ J_Date * as.factor(Year) + RainS, 
+                 data = F_Herb_Les)
+
+summary(CLIMRL)
+
+lrtest(nullmodelL, CLIMRL)
+
+high_rains <- quantile(F_Herb_Les$RainS, 0.90, na.rm = TRUE)
+low_rains  <- quantile(F_Herb_Les$RainS, 0.10, na.rm = TRUE)
+
+pred_grid_climr <- expand.grid(
+  J_Date = seq(min(F_Herb_Les$J_Date, na.rm = TRUE), 
+               max(F_Herb_Les$J_Date, na.rm = TRUE), 
+               length.out = 100),
+  RainS = c(low_rains, high_rains),
+  Year = unique(F_Herb_Les$Year)
+) %>%
+  mutate(
+    Rain_Level = ifelse(RainS > mean(RainS), "High Seasonal Rain", "Low Seasonal Rain")
+  )
+
+# Predict
+pred_grid_climr$Les_Pred <- predict(CLIMRL, newdata = pred_grid_climr)
+
+ggplot(F_Herb_Les, aes(x = J_Date, y = LesPerct)) +
+  geom_point(alpha = 0.2, color = "gray50") + 
+  geom_line(data = pred_grid_climr, 
+            aes(y = Les_Pred, color = Rain_Level), 
+            linewidth = 1.2) +
+  facet_wrap(~ Year) + 
+  scale_color_manual(values = c("High Seasonal Rain" = "magenta", 
+                                "Low Seasonal Rain" = "navy")) +
+  theme_bw() + 
+  labs(
+    title = "Provenance Summer Rainfall and Lesions",
+    x = "Julian Date",
+    y = "Lesions (%)",
+    color = "Provenance Summer Rainfall"
+  ) +
+  theme(
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(
+      color = "gray30",       
+      fill = NA,          
+      linewidth = 1         
+    ),
+    strip.background = element_rect(
+      color = "gray30",      
+      fill = "gray90",        
+      linewidth = 1         
+    ), 
+    strip.text = element_text(
+      face = "bold", 
+      color = "black", 
+      size = 11, 
+      margin = margin(5, 5, 5, 5)
+    )
+  )
+
+#############################################
+#MAT Lesions
+
+CLIMML <- betareg(LesPerct ~ J_Date * as.factor(Year) + MAT, 
+                 data = F_Herb_Les)
+
+summary(CLIMML)
+
+
+high_mat <- quantile(F_Herb_Les$MAT, 0.90, na.rm = TRUE)
+low_mat  <- quantile(F_Herb_Les$MAT, 0.10, na.rm = TRUE)
+
+pred_grid_climm <- expand.grid(
+  J_Date = seq(min(F_Herb_Les$J_Date, na.rm = TRUE), 
+               max(F_Herb_Les$J_Date, na.rm = TRUE), 
+               length.out = 100),
+  MAT = c(low_mat, high_mat),
+  Year = unique(F_Herb_Les$Year)
+) %>%
+  mutate(
+    MAT_Level = ifelse(MAT > mean(MAT), "High MAT", "Low MAT")
+  )
+
+# Predict
+pred_grid_climm$Les_Pred <- predict(CLIMML, newdata = pred_grid_climm)
+
+ggplot(F_Herb_Les, aes(x = J_Date, y = LesPerct)) +
+  geom_point(alpha = 0.2, color = "gray50") + 
+  geom_line(data = pred_grid_climm, 
+            aes(y = Les_Pred, color = MAT_Level), 
+            linewidth = 1.2) +
+  facet_wrap(~ Year) + 
+  scale_color_manual(values = c("High MAT" = "magenta", 
+                                "Low MAT" = "navy")) +
+  theme_bw() + 
+  labs(
+    title = "Provenance MAT and Lesions",
+    x = "Julian Date",
+    y = "Lesions (%)",
+    color = "Provenance MAT"
+  ) +
+  theme(
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    panel.border = element_rect(
+      color = "gray30",       
+      fill = NA,          
+      linewidth = 1         
+    ),
+    strip.background = element_rect(
+      color = "gray30",      
+      fill = "gray90",        
+      linewidth = 1         
+    ), 
+    strip.text = element_text(
+      face = "bold", 
+      color = "black", 
+      size = 11, 
+      margin = margin(5, 5, 5, 5)
+    )
+  )
+
+##################################
+#check models against null model: Lesions
+library(lmtest)
+citation("lmtest")
+
+lrtest(nullmodelL, CLIMRL)
+#Likelihood ratio test
+#Model 1: LesPerct ~ 1
+#Model 2: LesPerct ~ J_Date + RainS
+#Df LogLik Df  Chisq Pr(>Chisq)    
+#1   3 551.15                         
+#2   9 679.63  6 256.95  < 2.2e-16 ***
+
+ # Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+par(mfrow = c(1, 2))
+plot(CLIMLR, which = c(1, 4))
+
+#check models against null model: Lesions
+library(lmtest)
+citation("lmtest")
+###################
+
+lrtest(nullmodelL, CLIMRL)
+#Likelihood ratio test
+#Model 1: LesPerct ~ 1
+#Model 2: LesPerct ~ J_Date + MAT
+#Df LogLik Df  Chisq Pr(>Chisq)    
+#1   3 551.15                         
+#2     9 679.63  6 256.95  < 2.2e-16 ***
+
+#  Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+par(mfrow = c(1, 2))
+plot(CLIMRL, which = c(1, 4))
+
+####################
+lrtest(nullmodelL, CLIMML)
+#Likelihood ratio test
+
+par(mfrow = c(1, 2))
+plot(CLIMML, which = c(1, 4))
+
+
+##########################################
+#plot residuals for climate lesions
+
+qqnorm(resid(CLIMLR), main = "Normal Q-Q Plot of Residuals: Lesions", 
+       sub = "Climate Model: Provenance Summer Rainfall", 
+       col = "blue")
+
+qqline(resid(CLIMLR), 
+       col = "magenta",        
+       lwd = 2,            
+       lty = 2)
+
+qqnorm(resid(CLIMLM), main = "Normal Q-Q Plot of Residuals: Lesions", 
+       sub = "Climate Model: Provenance Mean Annual Temperature", 
+       col = "blue")
+
+qqline(resid(CLIMLM), 
+       col = "magenta",        
+       lwd = 2,            
+       lty = 2)
+
+###############################################################################
 
 #Explore Binomial Data
 library(ggplot2)
@@ -994,28 +1670,31 @@ ggplot(F_2025H, aes(x=Week, y=Probability)) +
   geom_point(mapping = aes(Week, IV), col = c("red4")) +
   geom_smooth(mapping = aes(Week, IV), col = c("red4"), linewidth = 2) 
 
-#####################################
+
+##########################################################
 #binomial data SK ~ distance group (log regression)
+#No distance groups are significant for any 
+glmSKNull <- glm(SK ~ 1, family = binomial, data = F_Herb_Les)
 
-glmSK <- glm(SK ~ Distance_Group, family = binomial, data = F_Herb_Les)
+glmSK <- glm(SK ~ Distance_Group + J_Date * as.factor(Year), family = binomial, data = F_Herb_Les)
 summary(glmSK)
+#Use this one 
 
+glmSK1 <- glm(SK ~ Distance_Group + J_Date + as.factor(Year), family = binomial, data = F_Herb_Les)
+summary(glmSK1)
 
 plot_summs(glmSK, scale = TRUE, exp = TRUE)
 
-library(performance)
-citation("performance")
-library(jtools)
-citation("jtools")
-
-check_model(glmSK)
-
+anova(glmSK, glmSKNull, test = "Chisq")
 ###########################################
 #binomial data ED ~ distance group
-
-glmED <- glm(ED~ Distance_Group, family = binomial, data = F_ALL)
+glmEDNull <- glm(ED ~ 1, family = binomial, data = F_Herb_Les)
+glmED <- glm(ED~ Distance_Group + J_Date + as.factor(Year), family = binomial, data = F_Herb_Les)
 summary(glmED)
+#Use this one lower AIC
 
+glmED1 <- glm(ED~ Distance_Group + J_Date * as.factor(Year), family = binomial, data = F_Herb_Les)
+summary(glmED1)
 
 plot_summs(glmED, scale = TRUE, exp = TRUE)
 
@@ -1025,200 +1704,449 @@ check_model(glmED)
 
 ###########################################
 #binomial data IV ~ distance group
+glmIVNull <- glm(IV ~ 1, family = binomial, data = F_Herb_Les)
 
-glmIV <- glm(IV~ Distance_Group, family = binomial, data = F_ALL)
+glmIV <- glm(IV~ Distance_Group + J_Date + as.factor(Year), family = binomial, data = F_Herb_Les)
 summary(glmIV)
+#Use this one, both are basically the same  
+
+glmIV1 <- glm(IV~ Distance_Group + J_Date * as.factor(Year), family = binomial, data = F_Herb_Les)
+summary(glmIV1)
 
 
 plot_summs(glmIV, scale = TRUE, exp = TRUE)
-
-
-library(performance)
-
-check_model(glmIV)
 
 ###########################################
 #binomial data shot holes~ distance group
+glmSHNull <- glm(SH ~ 1, family = binomial, data = F_Herb_Les)
 
-glmSH <- glm(SH~ Distance_Group, family = binomial, data = F_ALL)
+glmSH <- glm(SH~ Distance_Group + J_Date + as.factor(Year), family = binomial, data = F_Herb_Les)
 summary(glmSH)
+
+
+glmSH1 <- glm(SH~ Distance_Group + J_Date * as.factor(Year), family = binomial, data = F_Herb_Les)
+summary(glmSH1)
 
 
 plot_summs(glmSH, scale = TRUE, exp = TRUE)
 
-library(performance)
-
-check_model(glmSH)
 ###########################################
 #binomial data necrosis~ distance group
+glmSKNull <- glm(SK ~ 1, family = binomial, data = F_Herb_Les)
 
-glmNec <- glm(Nec~ Distance_Group, family = binomial, data = F_ALL)
+glmNec <- glm(Nec~ Distance_Group + J_Date + as.factor(Year), family = binomial, data = F_Herb_Les)
 summary(glmNec)
+#Use this one 
+
+glmNec1 <- glm(Nec~ Distance_Group + J_Date * as.factor(Year), family = binomial, data = F_Herb_Les)
+summary(glmNec1)
 
 
 plot_summs(glmNec, scale = TRUE, exp = TRUE)
-
-library(performance)
-
-check_model(glmNec)
 
 ###########################################
 #binomial data galls~ distance group
+glmGallNull <- glm(Galls ~ 1, family = binomial, data = F_Herb_Les)
 
-glmGalls <- glm(Galls~ Distance_Group, family = binomial, data = F_ALL)
-summary(glmGalls)
+glmGall <- glm(Galls~ Distance_Group + J_Date + as.factor(Year), family = binomial, data = F_Herb_Les)
+summary(glmGall)
+#Use this one 
+
+glmGall1 <- glm(Galls~ Distance_Group + J_Date * as.factor(Year), family = binomial, data = F_Herb_Les)
+summary(glmGall1)
 
 
 plot_summs(glmGalls, scale = TRUE, exp = TRUE)
-
-library(performance)
-
-check_model(glmGalls)
 
 ###########################################
 #binomial data chlorosis~ distance group
+glmChlNull <- glm(CHL ~ 1, family = binomial, data = F_Herb_Les)
 
-glmCHL <- glm(CHL~ Distance_Group, family = binomial, data = F_ALL)
-summary(glmCHL)
+glmChl <- glm(CHL~ Distance_Group + J_Date + as.factor(Year), family = binomial, data = F_Herb_Les)
+summary(glmChl)
 
+glmChl1 <- glm(CHL~ Distance_Group + J_Date * as.factor(Year), family = binomial, data = F_Herb_Les)
+summary(glmChl1)
 
 plot_summs(glmCHL, scale = TRUE, exp = TRUE)
 
-library(performance)
-
-check_model(glmCHL)
-
 ###########################################
 #binomial data tunnel~ distance group
+glmTunNull <- glm(TUN ~ 1, family = binomial, data = F_Herb_Les)
 
-glmTUN <- glm(TUN~ Distance_Group, family = binomial, data = F_ALL)
-summary(glmTUN)
+glmTun <- glm(TUN~ Distance_Group + J_Date + as.factor(Year), family = binomial, data = F_Herb_Les)
+summary(glmTun)
+
+glmTun1 <- glm(TUN~ Distance_Group + J_Date * as.factor(Year), family = binomial, data = F_Herb_Les)
+summary(glmTun1)
 
 
 plot_summs(glmTUN, scale = TRUE, exp = TRUE)
 
-library(performance)
-
-check_model(glmTUN)
-
-########################################
-
-#binomial data tunnel~ distance group
-
-glmSK <- glm(SK~ Distance_Group, family = binomial, data = F_ALL)
-summary(glmSK)
-
-
-plot_summs(glmSK, scale = TRUE, exp = TRUE)
-
-library(performance)
-
-check_model(glmSK)
+#######################################
 ##########################################################################################
-#Binomial data by YEARS
+#Binomial data by YEARS with logistic regression for binary data
 ########################################################################
-#binomial data SK ~ years
+#############
+#binomial data ~ Time 
+#lots significant by year 
+#(log regression)
 
-glmSK <- glm(SK ~ YR, family = binomial, data = F_ALLy)
+##
+#SK
+glmSK <- glm(SK ~ J_Date + as.factor(Year), family = binomial, data = F_Herb_Les)
 summary(glmSK)
 
+glmSK1 <- glm(SK ~ J_Date * as.factor(Year), family = binomial, data = F_Herb_Les)
+summary(glmSK1)
+#use this model, lower AIC
 
-plot_summs(glmSK, scale = TRUE, exp = TRUE)
+anova(glmSK, glmSK1, test = "Chisq")
+#Sig
 
-library(performance)
+anova(glmSK1, glmSKNull, test = "Chisq")
 
-check_model(glmSK)
-
-###########################################
-#binomial data ED ~ years
-
-glmED <- glm(ED~ YR, family = binomial, data = F_ALLy)
+###
+#ED
+glmED <- glm(ED ~ J_Date + as.factor(Year), family = binomial, data = F_Herb_Les)
 summary(glmED)
+#use this model
 
+glmED1 <- glm(ED ~ J_Date * as.factor(Year), family = binomial, data = F_Herb_Les)
+summary(glmED1)
 
-plot_summs(glmED, scale = TRUE, exp = TRUE)
+anova(glmED, glmED1, test = "Chisq")
+#not sig. 
+#####
 
-library(performance)
-
-check_model(glmED)
-
-###########################################
-#binomial data IV ~ years
-
-glmIV <- glm(IV~ YR, family = binomial, data = F_ALLy)
+glmIV <- glm(IV ~ J_Date + as.factor(Year), family = binomial, data = F_Herb_Les)
 summary(glmIV)
 
 
-plot_summs(glmIV, scale = TRUE, exp = TRUE)
+glmIV1 <- glm(IV ~ J_Date * as.factor(Year), family = binomial, data = F_Herb_Les)
+summary(glmIV1)
+#small difference, use glmIV1 as AIC slightly lower
 
-library(performance)
+anova(glmIV, glmIV1, test = "Chisq")
+#not sig
 
-check_model(glmIV)
+anova(glmIV1, glmIVNull, test = "Chisq")
 
-###########################################
-#binomial data shot holes~ years
+##
+#SH
 
-glmSH <- glm(SH~ YR, family = binomial, data = F_ALLy)
+glmSH <- glm(SH ~ J_Date + as.factor(Year), family = binomial, data = F_Herb_Les)
 summary(glmSH)
 
 
-plot_summs(glmSH, scale = TRUE, exp = TRUE)
+glmSH1 <- glm(SH ~ J_Date * as.factor(Year), family = binomial, data = F_Herb_Les)
+summary(glmSH1)
+#use this model, lower AIC
 
-library(performance)
+anova(glmSH, glmSH1, test = "Chisq")
+#significant
+anova(glmSH1, glmSHNull, test = "Chisq")
 
-check_model(glmSH)
-###########################################
-#binomial data necrosis~ years
+###
 
-glmNec <- glm(Nec~ YR, family = binomial, data = F_ALLy)
+#Nec
+
+glmNec <- glm(Nec ~ J_Date + as.factor(Year), family = binomial, data = F_Herb_Les)
 summary(glmNec)
+#use this one, not really different 
+
+glmNec1 <- glm(Nec ~ J_Date * as.factor(Year), family = binomial, data = F_Herb_Les)
+summary(glmNec1)
+#use this model, lower AIC
+
+anova(glmNec, glmNec1, test = "Chisq")
+#not significant
+
+anova(glmNec, glmNec1, test = "Chisq")
+#########
+#galls
+
+glmgall <- glm(Galls ~ J_Date + as.factor(Year), family = binomial, data = F_Herb_Les)
+summary(glmgall)
+
+glmgall1 <- glm(Galls ~ J_Date * as.factor(Year), family = binomial, data = F_Herb_Les)
+summary(glmgall1)
+
+anova(glmgall, glmGallNull, test = "Chisq")
+
+#nothing significant
+
+#########
+#CHL 
+
+glmChl <- glm(CHL ~ J_Date + as.factor(Year), family = binomial, data = F_Herb_Les)
+summary(glmChl)
 
 
-plot_summs(glmNec, scale = TRUE, exp = TRUE)
+glmChl1 <- glm(CHL ~ J_Date * as.factor(Year), family = binomial, data = F_Herb_Les)
+summary(glmChl1)
+#use this model, slightly lower AIC
 
-library(performance)
+anova(glmChl, glmChl1, test = "Chisq")
+#not significant
 
-check_model(glmNec)
-
-###########################################
-#binomial data galls~ years
-
-glmGalls <- glm(Galls~ YR, family = binomial, data = F_ALLy)
-summary(glmGalls)
+anova(glmChl, glmChlNull, test = "Chisq")
 
 
-plot_summs(glmGalls, scale = TRUE, exp = TRUE)
+###
+#Tunnel 
 
-library(performance)
+glmTun <- glm(TUN ~ J_Date + as.factor(Year), family = binomial, data = F_Herb_Les)
+summary(glmTun)
+#use this one, not really different 
 
-check_model(glmGalls)
+glmTun1 <- glm(TUN ~ J_Date * as.factor(Year), family = binomial, data = F_Herb_Les)
+summary(glmTun1)
+#use this model, lower AIC
 
-###########################################
-#binomial data chlorosis~ years
+anova(glmTun, glmTun1, test = "Chisq")
+#significant
+anova(glmTun, glmTunNull, test = "Chisq")
 
-glmCHL <- glm(CHL~ YR, family = binomial, data = F_ALLy)
-summary(glmCHL)
+##################################################################################
+#plot sampling date and location and herbivory 
+#looks OK, columns by letter (all A, then all B, etc)
+
+data(plot_map_d)
+library(ggplot2)
+library(viridis)
+library(wesanderson)
+citation ("viridis")
+#herb
+plotmap1 <- ggplot(plot_map_d) + 
+  geom_point(mapping = aes(Letters, Numbers, colour = Date, size = Herb_score)) +
+  scale_color_viridis_c(option = "viridis") +
+  labs(
+    x = "Plot", 
+    y = "ID", 
+    colour = "Date Sampled", 
+    size = "Herbivory score"
+  )
+
+plotmap1
+
+#lesions
+#viridis scale 
+
+plotmap1 <- ggplot(plot_map_d) + 
+  geom_point(
+    mapping = aes(Letters, Numbers, fill = Date, size = Herb_score), 
+    shape = 21,          
+    colour = "black",   
+    stroke = 0.5         
+  ) +
+  scale_fill_viridis_c(option = "viridis") +
+  labs(
+    x = "Plot", 
+    y = "ID", 
+    fill = "Date Sampled", 
+    size = "Herbivory score"
+  )
+plotmap1
+
+plotmap2 <- ggplot(plot_map_d) + 
+  geom_point(
+    mapping = aes(Letters, Numbers, fill = Date, size = Lesion_score), 
+    shape = 21,         
+    colour = "black",   
+    stroke = 0.5        
+  ) +
+  scale_fill_viridis_c(option = "viridis") +
+  labs(
+    x = "Plot", 
+    y = "ID", 
+    fill = "Date Sampled", 
+    size = "Lesion score"
+  )
+plotmap2
+
+library(patchwork)
 
 
-plot_summs(glmCHL, scale = TRUE, exp = TRUE)
+plotmap1 + plotmap2 +
+  plot_layout(ncol = 2)
 
-library(performance)
+#by distance group instead of date
+data(plot_map_d)
 
-check_model(glmCHL)
+plotmap3 <- ggplot(plot_map_d) + 
+  geom_point(
+    mapping = aes(Letters, Numbers, fill = Distance_Group, size = Herb_score), 
+    shape = 21,          
+    colour = "darkgray",   
+    stroke = 0.8        
+  ) +
+  scale_fill_viridis_d(option = "mako") + 
+  labs(
+    x = "Plot", 
+    y = "ID", 
+    fill = "Distance Group",      
+    size = "Herbivory score"
+  ) + 
+  theme(
+    legend.title = element_text(size = 14, face = "bold"), 
+    legend.text = element_text(size = 12),               
+    legend.key.height = unit(1, "cm"),                   
+    legend.key.width = unit(1, "cm")                    
+  ) +
+  guides(fill = guide_legend(override.aes = list(size = 6)))
 
-###########################################
-#binomial data tunnel~ years
+plotmap3
 
-glmTUN <- glm(TUN~ YR, family = binomial, data = F_ALLy)
-summary(glmTUN)
+plotmap4 <- ggplot(plot_map_d) + 
+  geom_point(
+    mapping = aes(Letters, Numbers, fill = Distance_Group, size = Lesion_score), 
+    shape = 21,          
+    colour = "darkgray",   
+    stroke = 0.8       
+  ) +
+  scale_fill_viridis_d(option = "mako")+ 
+  labs(
+    x = "Plot", 
+    y = "ID", 
+    fill = "Distance Group",    
+    size = "Lesion score") +
+   theme(
+    legend.title = element_text(size = 14, face = "bold"), 
+    legend.text = element_text(size = 12),               
+    legend.key.height = unit(1, "cm"),                   
+    legend.key.width = unit(1, "cm")                    
+  ) +
+  guides(fill = guide_legend(override.aes = list(size = 6)))
+
+plotmap4
+
+library(patchwork)
 
 
-plot_summs(glmTUN, scale = TRUE, exp = TRUE)
+plotmap3 + plotmap4 +
+  plot_layout(ncol = 2)
 
-library(performance)
+plotmap1 + plotmap2 + plotmap3 + plotmap4 +
+  plot_layout(ncol = 2)
+############################################################
+#same as above but with date-distance-pop-herb score
+data(plot_map_d)
+library(ggplot2)
 
-check_model(glmTUN)
-###########################################
+plotmap <-ggplot(plot_map_d) + 
+  geom_point(mapping = aes(Herb_score, Population, colour = Date, size = Distance_Group))
+plotmap
+###################################################################################
+#try to get plot to reflect common garden set up 
+data(plot_map)
+library(viridis)
+library(ggplot2)
+library(ggExtra)
+
+p <-ggplot(plot_map,aes(Plot,ID,fill=Date))+
+  geom_tile(color= "white",linewidth=0.1) + 
+  scale_fill_viridis(name="Date Sampled",option ="C")
+p
+#same as point map above
+
+p <-p + facet_grid(Plot~ID)
+p
+p <-p + scale_y_continuous(trans = "reverse", breaks = unique(plot_map$ID))
+p <-p + scale_x_continuous(breaks =c(1,10,20,31))
+p <-p + theme_minimal(base_size = 8)
+p <-p + labs(title= paste("Hourly Temps - Station"), x="Day", y="Hour Commencing")
+p <-p + theme(legend.position = "bottom")+
+  theme(plot.title=element_text(size = 14))+
+  theme(axis.text.y=element_text(size=6)) +
+  theme(strip.background = element_rect(colour="white"))+
+  theme(plot.title=element_text(hjust=0))+
+  theme(axis.ticks=element_blank())+
+  theme(axis.text=element_text(size=7))+
+  theme(legend.title=element_text(size=8))+
+  theme(legend.text=element_text(size=6))+
+  removeGrid()
+
+#faceted residual plots from model results
+citation("dplyr")
+citation("tidyr")
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+
+#herbivory
+
+mods <- list(
+  m1 = DAY,
+  m2 = GEO,
+  m3 = WTHR, 
+  m4 = CLIMM, 
+  m5 = CLIMR)
+
+res_df <- bind_rows(lapply(names(mods), function(nm) {
+  data.frame(
+    model = nm,
+    residual = residuals(mods[[nm]])
+  )
+}))
+
+model_labels <- c(
+  m1 = "Julian Date",
+  m2 = "Geography",
+  m3 = "Weather",
+  m4 = "Climate: Provenance MAT", 
+  m5 = "Climate: Provenance RainS"
+)
+
+# Faceted QQ plots
+ggplot(res_df, aes(sample = residual)) +
+  stat_qq(color = "darkblue") +
+  stat_qq_line(color = "magenta") +
+  facet_wrap(~ model, labeller = as_labeller(model_labels), scales = "free") +
+  theme_minimal() +
+  labs(
+    title = "QQ Plots of Residuals for Herbivory",
+    x = "Theoretical Quantiles",
+    y = "Sample Quantiles"
+  )
+
+#lesions
+
+mods <- list(
+  m1 = DAYL,
+  m2 = GEOL,
+  m3 = WTHRL, 
+  m4 = CLIMLM, 
+  m5 = CLIMLR)
+
+res_df <- bind_rows(lapply(names(mods), function(nm) {
+  data.frame(
+    model = nm,
+    residual = residuals(mods[[nm]])
+  )
+}))
+
+model_labels <- c(
+  m1 = "Julian Date",
+  m2 = "Geography",
+  m3 = "Weather",
+  m4 = "Climate: MAT", 
+  m5 = "Climate: RainS"
+)
+
+# Faceted QQ plots
+ggplot(res_df, aes(sample = residual)) +
+  stat_qq(color = "darkblue") +
+  stat_qq_line(color = "magenta") +
+  facet_wrap(~ model, labeller = as_labeller(model_labels), scales = "free") +
+  theme_minimal() +
+  labs(
+    title = "QQ Plots of Residuals for Lesions",
+    x = "Theoretical Quantiles",
+    y = "Sample Quantiles"
+  )
+
+######################################
 #plot blocks and damage scores by location 
 
 library(ggplot2)
@@ -1335,6 +2263,7 @@ ggplot(plot_filtered, aes(x = Date_Factor, y = as.factor(Numbers))) +
     legend.position = "top",
     panel.grid = element_blank()
   )
+
 
 
 
